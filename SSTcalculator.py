@@ -60,8 +60,6 @@ class SSTcalculator:
         sst_df_sea_only_ = sst_df_sea_only.stack().reset_index()
         sst_df_sea_only_.columns = ['LATITUDE', 'LONGITUDE', 'SST']
 
-        print(sst_df_sea_only_.shape)
-
         x, y, z = self.lon_lat_to_cartesian(sst_df_sea_only_.LONGITUDE, sst_df_sea_only_.LATITUDE)
         tree = cKDTree(np.array(list(zip(x, y, z))))
 
