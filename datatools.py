@@ -7,7 +7,7 @@ import concurrent.futures
 class dailyRainHandler:
     '''
     Compute the monthly maximum rainfall/temperature data based on daily data.
-    The range of temperatures will be computed as well..
+    The range of temperatures will be computed as well.
 
     Args:
         file_dir (string): the directory where the rainfall records are stored.
@@ -42,7 +42,7 @@ class dailyRainHandler:
 
         data_frame['DATE'] = pd.to_datetime(data_frame.DATE, format = "%Y%m%d")
         pivot_table = data_frame.pivot(index = 'DATE',
-                                       columns = 'STATION', #use station name might cause a duplicate problem
+                                       columns = 'STATION', #use STATION_NAME might cause a duplicate problem
                                        values =['PRCP', 'TMAX', 'TMIN','LONGITUDE',
                                                 'LATITUDE','ELEVATION'
                                                ]
