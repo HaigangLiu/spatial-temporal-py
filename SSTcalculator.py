@@ -2,12 +2,11 @@ import pandas as pd
 import numpy as np
 import os
 from netCDF4 import Dataset
-from functools import partial
-from scipy.stats import norm
 from scipy.spatial import cKDTree
 
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
+
 class SSTcalculator:
 
     def __init__(self, nc_data_dir, nc_mask_dir):
@@ -15,7 +14,7 @@ class SSTcalculator:
         '''
         Args:
             nc_data_dir (str): The directory to the sea surface temperature
-            nc_mask_dir (str): The directory to the mask land from sea.
+            nc_mask_dir (str): The directory to mask the land from sea.
         '''
 
         self.nc_data =Dataset(nc_data_dir, mode = 'r')
@@ -75,7 +74,6 @@ class SSTcalculator:
             sst_list.append(average_sst)
 
         spatial_points['SST'] = sst_list
-
         return spatial_points
 
     def look_up_engine(self, starting_date, end_date, spatial_points):
