@@ -3,7 +3,7 @@ import numpy as np
 import os
 from functools import partial
 
-class dailyRainHandler:
+class dailyToMonthlyConverter:
     '''
     Compute the monthly maximum rainfall/temperature data based on daily data.
     The range of temperatures will be computed as well.
@@ -60,12 +60,15 @@ class dailyRainHandler:
         output_df['RANGE_OVERALL'] = max_values_['TMAX'] - min_values_['TMIN']
         output_df['RANGE_MID'] = 0.5*(max_values_['TMAX'] + min_values_['TMIN'])
 
+        output_df['TMIN'] = min_values_['TMIN'] #min is the min of all min
+        output_df['TMAX'] = max_values_['TMAX'] #max is the max of all max
+
         output_df["YEAR"] = output_df['DATE'].dt.year
         output_df["MONTH"] = output_df['DATE'].dt.month
 
         return output_df
 
-    def process_all_files(self, new_file_name):
+    def process_all_files_and_save_to(self, new_file_name):
         file_content_list = []
         for file_name in os.listdir(self.file_dir):
             if file_name.endswith('.csv'):
@@ -81,5 +84,5 @@ class dailyRainHandler:
 if __name__ == '__main__':
     raw_daily_rain_file = '/Users/haigangliu/Dropbox/DissertationCode/precipitation/'
     target_dir = '/Users/haigangliu/Dropbox/DissertationCode/synthetic_data/'
-    handler = dailyRainHandler(raw_daily_rain_file, target_dir)
-    all_files = handler.process_all_files('monthly_rainfall.csv')
+    handler = dailyToMonthlyConverter(raw_daily_rain_file, target_dir)
+    all_files = handler.process_all_files_and_save_to('monthly_rainfall.csv')
