@@ -1,4 +1,3 @@
-from datatools import dailyToMonthlyConverter
 from SSTcalculator import SSTcalculator
 import pandas as pd
 from dateutil import relativedelta
@@ -74,15 +73,19 @@ class RangeSelector:
     def flip_to_flat_and_wide(self, vars_to_retain = None):
 
         if vars_to_retain is None:
-            vars_to_retain = ['PRCP', 'SST','RANGE_HIGH','RANGE_OVERALL',
-                                'RANGE_LOW','TMIN', 'TMAX']
+            vars_to_retain = ['PRCP', 'SST','RANGE_HIGH','RANGE_OVERALL', 'RANGE_LOW','TMIN', 'TMAX']
 
         column_name = []
         for var in vars_to_retain:
             for i in range(self.month_count):
                 column_name.append(var + str(i + 1))
+
+        location_info = self.merged_table[['STATION', 'LATITUDE', 'LONGITUDE']]
+        unique_locations = location_info.groupby('STATION').first().reset_index().copy()
+
         try:
             df_reindexed = self.merged_table.set_index(['STATION', 'DATE'])
+
         except:
             raise AttributeError('Need to first call merge_with_sst()')
 
@@ -90,7 +93,11 @@ class RangeSelector:
         temp1_index = df_reindexed.unstack()[vars_to_retain].index
         output = pd.DataFrame(temp1, columns = column_name, index = temp1_index).reset_index()
 
-        return output
+        output.set_index('STATION', inplace = True)
+        unique_locations.set_index('STATION', inplace = True)
+
+        output_with_lat_lon = output.merge(unique_locations, left_index = True, right_index = True).reset_index()
+        return output_with_lat_lon
 
 if __name__ == '__main__':
 
@@ -106,6 +113,6 @@ if __name__ == '__main__':
     selector = RangeSelector(monthly_rain, '2011-01', '2015-12')
     merged_table = selector.merge_with_sst(nc_data_dir, nc_mask_dir)
     merged_table_flat_and_wide = selector.flip_to_flat_and_wide()
-
+    print(merged_table_flat_and_wide.head())
     merged_table.to_csv(save_dir)
     merged_table_flat_and_wide.to_csv(save_dir2)
