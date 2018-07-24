@@ -27,7 +27,7 @@ class SSTcalculator:
         self.lons = np.array([term if term <= 180 else (term -360) for term in self.lons])
 
     @staticmethod
-    def lon_lat_to_cartesian(lon, lat, R = 3959):
+    def _lat_lon_to_cartesian(lon, lat, R = 3959):
         """
         Asssuming that earth is a perfect sphere.
         calculates lon, lat coordinates of a point on a sphere with radius R.
@@ -60,10 +60,10 @@ class SSTcalculator:
         sst_df_sea_only_ = sst_df_sea_only.stack().reset_index()
         sst_df_sea_only_.columns = ['LATITUDE', 'LONGITUDE', 'SST']
 
-        x, y, z = self.lon_lat_to_cartesian(sst_df_sea_only_.LONGITUDE, sst_df_sea_only_.LATITUDE)
+        x, y, z = self._lat_lon_to_cartesian(sst_df_sea_only_.LONGITUDE, sst_df_sea_only_.LATITUDE)
         tree = cKDTree(np.array(list(zip(x, y, z))))
 
-        x1, y1, z1 = self.lon_lat_to_cartesian(spatial_points.LONGITUDE, spatial_points.LATITUDE)
+        x1, y1, z1 = self._lat_lon_to_cartesian(spatial_points.LONGITUDE, spatial_points.LATITUDE)
         distances, idx = tree.query(np.array(list(zip(x1, y1, z1))), k = n_neighbors)
 
         sst_list = []
