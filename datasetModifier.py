@@ -1,6 +1,7 @@
 import numpy as np
 from sklearn import linear_model
 import pandas as pd
+
 class SimpleTrendRemover:
     '''
     Find the average the trend of Y (rainfall volume),
@@ -23,6 +24,7 @@ class SimpleTrendRemover:
         self._find_the_trend()
 
     def _find_the_trend(self):
+
         if self.flat_and_wide:
 
             avg = self.data_frame.mean(axis = 0)
@@ -50,6 +52,7 @@ class SimpleTrendRemover:
         self.avg_trend = avg_trend
 
     def update_dataframe_with_resid(self):
+
         if self.flat_and_wide:
             self.data_frame[self._response_vars] = self.data_frame[self._response_vars] - self.avg_trend
         else:
@@ -59,9 +62,8 @@ class SimpleTrendRemover:
 
         return self.data_frame
 
-
 if __name__ == '__main__':
-    
+
     df = pd.read_csv('/Users/haigangliu/Dropbox/DissertationCode/synthetic_data/with_sst_5_years_flat_and_wide.csv')
     trend_remover = SimpleTrendRemover(data_frame= df, response_var='PRCP', flat_and_wide= True)
     f = trend_remover.update_dataframe_with_resid()
@@ -71,7 +73,3 @@ if __name__ == '__main__':
     trend_remover2 = SimpleTrendRemover(data_frame= df2, response_var='PRCP', flat_and_wide= False)
     f2 = trend_remover2.update_dataframe_with_resid()
     f2.to_csv('/Users/haigangliu/Dropbox/DissertationCode/synthetic_data/with_sst_5_years_residual.csv')
-
-
-
-
