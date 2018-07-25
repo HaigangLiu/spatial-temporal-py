@@ -1,3 +1,4 @@
+import numpy as np
 import pandas as pd
 import urllib
 
@@ -88,7 +89,7 @@ class DailyFloodDataDownloader:
             all_stations_df = pd.concat(all_stations_df, axis = 0)
 
         number_of_records = all_stations_df.shape[0]
-        number_of_locs = len(all_stations_df['SITENUMBER'])
+        number_of_locs = len(np.unique(all_stations_df['SITENUMBER']))
 
         print(f'There are {number_of_locs} locations and {number_of_records} in total.')
 
