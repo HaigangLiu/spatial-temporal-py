@@ -5,12 +5,20 @@ import urllib
 
 class DailyFloodDataDownloader:
 
-    def __init__(self, station_list = None):
+    '''
+    Get the daily gauge data from the usgs website. The list of
+    locations are defined in NWISMapperExport.csv. User can also upload
+    a customized file of locations and site numbers.
+
+    Args (summary_file dataframe): Optional. A summary of gage stations where we retrieve data from.
+    '''
+
+    def __init__(self, summary_file = None):
 
         self.url_part_1 = 'https://waterdata.usgs.gov/nwis/dv?cb_00065=on&format=rdb&site_no='
         self.url_part_2 = '&referred_module=sw&period=&begin_date=1800-01-01&end_date=2020-01-01'
 
-        if station_list is None:
+        if summary_file is None:
             self.summary_file = pd.read_csv('~/spatial-temporal-py/data/NWISMapperExport.csv', dtype = {'SiteNumber': str})
             self.station_list = self.summary_file['SiteNumber']
 
@@ -59,22 +67,36 @@ class DailyFloodDataDownloader:
             print('Got an empty data frame.')
             return None
 
-    def parsing_engine(self):
-        all_stations_df = []
-        for station_id in self.station_list:
-            single_station_info = self._single_station_parser(station_id)
-            all_stations_df.append(single_station_info)
-        return pd.concat(all_stations_df, axis = 0)
+    def parsing_engine(self, multiprocessing = True):
 
-    def parsing_engine_multiprocessing(self, number_of_cores = 8):
-        import concurrent.futures
-        executor = concurrent.futures.ProcessPoolExecutor(max_workers = number_of_cores)
-        result_generator = executor.map(self._single_station_parser, self.station_list)
-        all_stations_df = pd.concat([df for df in result_generator])
+        '''
+        Args:
+            multiprocessing (bool): The parsing engine uses multiprocessing in default. Highly recommended if
+            you don't want to spend all day on this.
+        '''
+
+        if multiprocessing:
+            import concurrent.futures
+            executor = concurrent.futures.ProcessPoolExecutor(max_workers = 8)
+            result_generator = executor.map(self._single_station_parser, self.station_list)
+            all_stations_df = pd.concat([df for df in result_generator])
+        else:
+            all_stations_df = []
+            for station_id in self.station_list:
+                single_station_info = self._single_station_parser(station_id)
+                all_stations_df.append(single_station_info)
+            all_stations_df = pd.concat(all_stations_df, axis = 0)
+
+        number_of_records = all_stations_df.shape[0]
+        number_of_locs = len(all_stations_df['SITENUMBER'])
+
+        print(f'There are {number_of_locs} locations and {number_of_records} in total.')
+
         return all_stations_df
 
 if __name__ == '__main__':
+
     scraper = DailyFloodDataDownloader()
-    test = scraper.parsing_engine_multiprocessing(number_of_cores = 8)
-    # test.to_csv('/Users/haigangliu/Dropbox/DissertationCode/synthetic_data/flood_data_daily.csv')
+    test = scraper.parsing_engine(multiprocessing = True)
+    test.to_csv('/Users/haigangliu/Dropbox/DissertationCode/synthetic_data/flood_data_daily.csv')
     print(test.head())
