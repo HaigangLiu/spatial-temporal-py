@@ -13,7 +13,7 @@ class dailyToMonthlyConverter:
          speficy the aggregation method.
         2 Variable like PRCP: the variable change over time. We
         need to aggregate over them. And the aggregation operation
-        must be specified. Preferably as numpy as function like np.max.
+        must be specified. Preferably as numpy functions like np.max.
         3. Variables like ELEVATION: the variable that does not
          change over time. You still need to specify an operation,
          but anything would be fine.
