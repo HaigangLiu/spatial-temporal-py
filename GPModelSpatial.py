@@ -15,8 +15,10 @@ class GPModelSpatial:
         year (int): The year to analyze
         month (int): The month to analyze
         response_var(str): The response variable to analyze
-        dataform (pandas dataframe): The dataframe with rainfall volume with date and time information.
+        dataform (pandas dataframe): The dataframe with rainfall
+        volume with date and time information.
     '''
+
     def __init__(self, year, month, dataform, response_var):
         df = dataform[(dataform.YEAR == year) & (dataform.MONTH == month) ]
         d1, d2, d3 = SSTcalculator._lat_lon_to_cartesian(df['LATITUDE'], df['LONGITUDE'])
@@ -43,14 +45,12 @@ class GPModelSpatial:
             fig, axs = plt.subplots(2, 2)
             pm.traceplot(self.trace, varnames = ['rho', 'sigma'], ax = axs)
             fig.savefig('plottest.png')
-            # plt.show()
 
     def predict(self, new_data):
         self.X.set_value(new_data)
         with self.model:
             predicted_values = pm.sample_ppc(self.trace)
         return predicted_values
-
 
 if __name__ == '__main__':
     data_form = pd.read_csv('/Users/haigangliu/Dropbox/DissertationCode/synthetic_data/with_sst_5_years.csv')
