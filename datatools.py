@@ -4,15 +4,26 @@ import os
 
 class dailyToMonthlyConverter:
     '''
-    Compute the monthly maximum rainfall/temperature data based on daily data.
-    The range of temperatures will be computed as well.
+    Convert daily data into monthly data based on given aggregation operations.
+
+    There are three kinds of variables:
+
+        1. STATION and DATE: used as index. Users need to specify
+         what they are called in the dataframe, but do not need to
+         speficy the aggregation method.
+        2 Variable like PRCP: the variable change over time. We
+        need to aggregate over them. And the aggregation operation
+        must be specified. Preferably as numpy as function like np.max.
+        3. Variables like ELEVATION: the variable that does not
+         change over time. You still need to specify an operation,
+         but anything would be fine.
 
     Args:
         file_dir (string): the directory where the rainfall records are stored.
         dtype_dict (dict): a dictionary of data type
         aggregation_operations(dict): a dictionary of aggregation operations from daily record to monthly.
             Example: {'NEW_PRCP': [np.max, 'PRCP']}
-            NEW_PRCP is the new variable name, and np.max is the 
+            NEW_PRCP is the new variable name, and np.max is the
             name of aggregation, and 'PRCP' is the original name in the daily record
         station_column (str): name of the columnn of station name.
         date_column (str): name of the columnn of station name.
