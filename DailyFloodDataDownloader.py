@@ -20,7 +20,7 @@ class DailyFloodDataDownloader:
         self.url_part_2 = '&referred_module=sw&period=&begin_date=1800-01-01&end_date=2020-01-01'
 
         if summary_file is None:
-            self.summary_file = pd.read_csv('~/spatial-temporal-py/data/NWISMapperExport.csv', dtype = {'SiteNumber': str})
+            self.summary_file = pd.read_csv('./data/NWISMapperExport.csv', dtype = {'SiteNumber': str})
             self.station_list = self.summary_file['SiteNumber']
 
     def _single_station_parser(self, station_id):
@@ -42,8 +42,7 @@ class DailyFloodDataDownloader:
         try:
             data_content.pop(0) if '5s' in data_content[0] else 0
         except IndexError:
-            print('The link is empty. Here is the response from the server:')
-            print(contents)
+            print(f'The link is empty. Here is the response from the server:{contents}')
             return None
 
         retained_vars = [column for column in columns if column.endswith(('00001', '00002', '00003', 'datetime'))]
