@@ -141,7 +141,10 @@ if __name__ == '__main__':
     monthly_rain_output['RANGE_MID'] = 0.5*monthly_rain_output['TMAX'] + monthly_rain_output['TMIN']
     monthly_rain_output.drop(['TMAX_MIN', 'TMIN_MAX'], inplace = True, axis = 1)
 
-    # note that user can pass in np.ptp function to calculate range, but doing that is mysteriously slow (24 sec for range vs 1 sec for max or min). That's why this operation is done manually like this.
+    # note that user can pass in np.ptp function to calculate
+    #range, but doing that is mysteriously slow (24 sec for range
+       # vs 1 sec for max or min). That's why this operation is
+       #  done manually like this.
 
     # ----- generate data for flood ------
     converter = dailyToMonthlyConverter('./data/',
