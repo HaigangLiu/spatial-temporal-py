@@ -10,14 +10,14 @@ class dailyToMonthlyConverter:
     Args:
         file_dir (string): the directory where the rainfall records are stored.
         dtype_dict (dict): a dictionary of data type
-        agg_ops(dict): a dictionary of aggregation operations from daily record to monthly.
+        aggregation_operations(dict): a dictionary of aggregation operations from daily record to monthly.
             Example: {'NEW_PRCP': [np.max, 'PRCP']}
             NEW_PRCP is the new variable name, and np.max is the 
             name of aggregation, and 'PRCP' is the original name in the daily record
         station_column (str): name of the columnn of station name.
         date_column (str): name of the columnn of station name.
     '''
-    def __init__(self, file_dir,  dtype_dict = None, agg_ops = None, station_column = None, date_column = None):
+    def __init__(self, file_dir,  dtype_dict = None, aggregation_operations = None, station_column = None, date_column = None):
 
         self.file_dir = file_dir
         self.file_list = [file_name for file_name in os.listdir(self.file_dir) if file_name.endswith('.csv')]
@@ -35,8 +35,8 @@ class dailyToMonthlyConverter:
         else:
             self.dtype_dict = dtype_dict
 
-        if agg_ops is None:
-            self.agg_ops = {'PRCP': [np.max, 'PRCP'],
+        if aggregation_operations is None:
+            self.aggregation_operations = {'PRCP': [np.max, 'PRCP'],
                             'TMAX': [np.max,'TMAX'],
                             'TMIN': [np.min, 'TMIN'],
                             'TMAX_MIN': [np.min, 'TMAX'],
@@ -44,7 +44,7 @@ class dailyToMonthlyConverter:
                             'ELEVATION': [np.max, 'ELEVATION']
                             }
         else:
-            self.agg_ops = agg_ops
+            self.aggregation_operations = aggregation_operations
 
         if station_column is None:
             self.station_column = 'STATION'
@@ -81,9 +81,9 @@ class dailyToMonthlyConverter:
                                        values = value_columns
                                        )
 
-        other_cols = [col for col in value_columns if col not in list(self.agg_ops.keys())]
+        other_cols = [col for col in value_columns if col not in list(self.aggregation_operations.keys())]
         output = pivot_table.resample('M').max().stack()[other_cols]
-        for new_col, ops_and_colname in self.agg_ops.items():
+        for new_col, ops_and_colname in self.aggregation_operations.items():
             ops, col = ops_and_colname
             output[new_col] = pivot_table.resample('M').apply(ops).stack()[col]
 
@@ -139,7 +139,7 @@ if __name__ == '__main__':
                       'DATE': str,
                       'GAGE_MAX': float,
                       'SITENUMBER': str},
-        agg_ops = {'GAGE_MAX': [np.max, 'GAGE_MAX']},
+        aggregation_operations = {'GAGE_MAX': [np.max, 'GAGE_MAX']},
         station_column = 'SITENUMBER',
         date_column = 'DATE')
 
