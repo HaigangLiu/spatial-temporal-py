@@ -47,9 +47,7 @@ class SimpleTrendRemover:
         cosine_coef, sin_coef = regression.coef_
         intercept = regression.intercept_
 
-        avg_trend = regression.predict(np.array([cos_term, sin_term]).T)
-
-        self.avg_trend = avg_trend
+        self.avg_trend = regression.predict(X)
 
     def update_dataframe_with_resid(self):
 
@@ -62,6 +60,23 @@ class SimpleTrendRemover:
 
         return self.data_frame
 
+def add_seasonal_indicator(dataframe, new_col = 'SEASON', rule = None):
+
+    dataframe[new_col] = 'Fall'
+
+    winter_mask = dataframe.MONTH.isin([12, 1, 2])
+    spring_mask = dataframe.MONTH.isin([3, 4, 5])
+    summer_mask = dataframe.MONTH.isin([6, 7, 8])
+
+    dataframe[new_col][winter_mask]= 'Winter'
+    dataframe[new_col][spring_mask]= 'Spring'
+    dataframe[new_col][summer_mask] = 'Summer'
+
+    indicators = pd.get_dummies(dataframe[new_col], drop_first= True)
+
+    return pd.concat([dataframe, indicators], axis = 1)
+
+
 if __name__ == '__main__':
 
     df = pd.read_csv('/Users/haigangliu/Dropbox/DissertationCode/synthetic_data/with_sst_5_years_flat_and_wide.csv')
@@ -69,7 +84,8 @@ if __name__ == '__main__':
     f = trend_remover.update_dataframe_with_resid()
     f.to_csv('/Users/haigangliu/Dropbox/DissertationCode/synthetic_data/with_sst_5_years_flat_and_wide_residual.csv')
 
-    df2 = pd.read_csv('/Users/haigangliu/Dropbox/DissertationCode/synthetic_data/with_sst_5_years.csv')
+    # df2 = pd.read_csv('/Users/haigangliu/Dropbox/DissertationCode/synthetic_data/with_sst_5_years.csv')
     trend_remover2 = SimpleTrendRemover(data_frame= df2, response_var='PRCP', flat_and_wide= False)
     f2 = trend_remover2.update_dataframe_with_resid()
-    f2.to_csv('/Users/haigangliu/Dropbox/DissertationCode/synthetic_data/with_sst_5_years_residual.csv')
+    # f2.to_csv('/Users/haigangliu/Dropbox/DissertationCode/synthetic_data/with_sst_5_years_residual.csv')
+
