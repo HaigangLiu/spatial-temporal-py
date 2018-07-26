@@ -6,6 +6,7 @@ import pandas as pd
 from SSTcalculator import SSTcalculator
 import matplotlib.pyplot as plt
 from theano import shared
+import os
 
 class GPModelSpatial:
 
@@ -45,6 +46,7 @@ class GPModelSpatial:
             fig, axs = plt.subplots(2, 2)
             pm.traceplot(self.trace, varnames = ['rho', 'sigma'], ax = axs)
             fig.savefig('plottest.png')
+            print(f'created plottest.png and saved to {os.getcwd()}')
 
     def predict(self, new_data):
         self.X.set_value(new_data)
