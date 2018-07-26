@@ -1,0 +1,176 @@
+,Unnamed: 0,SiteNumber,SiteName,SiteCategory,SiteAgency,SiteLongitude,SiteLatitude,SiteNWISURL
+0,0,02110400,"BUCK CREEK NEAR LONGS, SC",ST,USGS,-78.71973988,33.953505,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02110400
+1,1,02110500,"WACCAMAW RIVER NEAR LONGS, SC",ST,USGS,-78.7150175,33.9126719,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02110500
+2,2,02110550,"WACCAMAW RIVER ABOVE CONWAY, SC",ST-TS,USGS,-78.8972222,33.8508333,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02110550
+3,3,02110701,"CRABTREE SWAMP AT CONWAY, SC",ST,USGS,-79.04114709999999,33.86100349,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02110701
+4,4,02110704,"WACCAMAW RIVER AT CONWAY MARINA AT CONWAY, SC",ST,USGS,-79.0436473,33.8329481,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02110704
+5,5,02110725,"AIW AT HIGHWAY 544 AT SOCASTEE, SC",ST,USGS,-79.0047569,33.6871151,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02110725
+6,6,02110777,"AIW AT HIGHWAY 9 AT NIXONS CROSSROADS, SC",ST,USGS,-78.6558483,33.8515612,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02110777
+7,7,02110802,"WACCAMAW RIVER AT BUCKSPORT, SC",ST,USGS,-79.09420639,33.64905837,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02110802
+8,8,021108125,"WACCAMAW RIVER NEAR PAWLEYS ISLAND, SC",ST,USGS,-79.1269867,33.50655724,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=021108125
+9,9,02110815,"WACCAMAW R NR HAGLEY LAND. NR PAWLEYS ISLAND, SC",ST,USGS,-79.1739341,33.44461245,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02110815
+10,10,02130561,"PEE DEE RIVER NR BENNETTSVILLE, SC",ST,USGS,-79.7883963,34.60626798,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02130561
+11,11,02130810,"PEEDEE RIVER NEAR FLORENCE,SC",ST,USGS,-79.6344444,34.30027778,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02130810
+12,12,02130840,"BLACK CREEK BELOW CHESTERFIELD, SC",ST,USGS,-80.2116667,34.6633333,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02130840
+13,13,02130900,"BLACK CREEK NEAR MCBEE, SC",ST,USGS,-80.18312440000001,34.51404244,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02130900
+14,14,02130910,"BLACK CREEK NEAR HARTSVILLE, SC",ST,USGS,-80.14979100000001,34.39737618,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02130910
+15,15,02130980,"BLACK CREEK NEAR QUINBY, SC",ST,USGS,-79.7447833,34.24376518,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02130980
+16,16,02131000,"PEE DEE RIVER AT PEEDEE, SC",ST,USGS,-79.5483896,34.20432518,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02131000
+17,17,02131010,"PEE DEE RIVER BELOW PEE DEE, SC",ST,USGS,-79.55339040000001,34.15738145,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02131010
+18,18,021313485,"BUFFALO CREEK AT MT PISGAH, SC",ST,USGS,-80.4569444,34.582222200000004,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=021313485
+19,19,02131452,"LITTLE LYNCHES RIVER ABOVE KERSHAW, SC",ST,USGS,-80.5805556,34.5858333,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02131452
+20,20,02131455,"LITTLE LYNCHES RIVER NEAR KERSHAW, SC",ST,USGS,-80.54646109999999,34.5512656,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02131455
+21,21,02131472,"HANGING ROCK CREEK NR KERSHAW, SC",ST,USGS,-80.58285140000001,34.51626465,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02131472
+22,22,02131500,"LYNCHES RIVER NEAR BISHOPVILLE, SC",ST,USGS,-80.2136816,34.2501545,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02131500
+23,23,02132000,"LYNCHES RIVER AT EFFINGHAM, SC",ST,USGS,-79.7539545,34.05154846,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02132000
+24,24,02134900,"LUMBER RIVER AT NICHOLS,SC",ST,USGS,-79.1342051,34.22599744,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02134900
+25,25,02135000,"LITTLE PEE DEE R. AT GALIVANTS FERRY, SC",ST,USGS,-79.2469897,34.05710829,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02135000
+26,26,02135200,"PEE DEE RIVER AT HWY 701 NR BUCKSPORT, SC",ST,USGS,-79.15448740000001,33.6610024,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02135200
+27,27,02135501,"BLACK RIVER AT I-95, NEAR MANNING,SC",ST,USGS,-80.1315833,33.83388889,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02135501
+28,28,021355015,"TEARCOAT BRANCH AT I-95, NEAR MANNING,SC",ST,USGS,-80.1516111,33.81302778,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=021355015
+29,29,02136000,"BLACK RIVER AT KINGSTREE, SC",ST,USGS,-79.83590448,33.66127545,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02136000
+30,30,02136030,"BLACK RIVER NEAR ANDREWS,SC",ST,USGS,-79.54561819,33.49044467,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02136030
+31,31,02136350,PEEDEE RIVER AT GEORGETOWN S C,ST,USGS,-79.26366170000001,33.36933396,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02136350
+32,32,02136361,"TURKEY CREEK NEAR MARYVILLE, SC",ST,USGS,-79.3381102,33.32850037,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02136361
+33,33,021457492,"ALLISON CREEK AT RD 114 NEAR YORK, SC",ST,USGS,-81.1383333,35.065,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=021457492
+34,34,021459367,"BIG DUTCHMAN CREEK AT ROCK HILL, SC",ST,USGS,-81.00833889,34.9868083,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=021459367
+35,35,02146000,"CATAWBA RIVER NEAR ROCK HILL, SC",ST,USGS,-80.97396579999999,34.98486935,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02146000
+36,36,02146110,"MANCHESTER CREEK AT ROCK HILL, SC",ST,USGS,-80.97972220000001,34.94444444,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02146110
+37,37,0214676115,"MCALPINE CREEK AT SR2964 NR CAMP COX, SC",ST,USGS,-80.8916667,35.040833299999996,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=0214676115
+38,38,02146800,"SUGAR CREEK NEAR FORT MILL, SC",ST,USGS,-80.9022968,35.0059812,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02146800
+39,39,02147020,"CATAWBA RIVER BELOW CATAWBA, SC",ST,USGS,-80.879518,34.83625705,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02147020
+40,40,021473415,"FISHING CREEK @ HWY 5 BELOW YORK, SC",ST,USGS,-81.18,34.975,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=021473415
+41,41,021473426,"TOOLS FORK CREEK NEAR ROCK HILL, SC",ST,USGS,-81.1061882,34.95653054,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=021473426
+42,42,021473428,"WILDCAT CREEK BELOW ROCK HILL, SC",ST,USGS,-81.06924599999999,34.8895867,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=021473428
+43,43,02147500,"ROCKY CREEK AT GREAT FALLS, SC",ST,USGS,-80.9198025,34.5654221,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02147500
+44,44,02148000,"WATEREE RIVER NR. CAMDEN, SC",ST,USGS,-80.6539697,34.24459385,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02148000
+45,45,02153051,"GASTON SHOALS RESERVOIR ABOVE BLACKSBURG, SC",LK,USGS,-81.5978723,35.13762807,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02153051
+46,46,02153200,"BROAD RIVER NEAR BLACKSBURG, SC",ST,USGS,-81.58787199,35.12401728,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02153200
+47,47,02153550,"NINETYNINE ISLAND RES. BELOW CHEROKEE FALLS, SC",LK,USGS,-81.4934245,35.03179744,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02153550
+48,48,02153551,"BROAD RIVER BELOW NINETYNINE ISLAND RESERVOIR,SC",ST,USGS,-81.492591,35.0312419,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02153551
+49,49,02153590,"KINGS CREEK AT BLACKSBURG, SC",ST,USGS,-81.43647578,35.11846498,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02153590
+50,50,02153700,"THICKETTY CREEK AT CNTY ROAD 42 NEAR GAFFNEY, SC",ST,USGS,-81.71454440000001,35.0629045,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02153700
+51,51,02154500,"NORTH PACOLET RIVER AT FINGERVILLE, SC",ST,USGS,-81.9859403,35.12095166,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02154500
+52,52,02154790,"SOUTH PACOLET RIVER NR CAMPOBELLO, SC",ST,USGS,-82.12955490000002,35.10650510000001,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02154790
+53,53,02154950,"LAKE WILLIAM C. BOWEN NEAR FINGERVILLE, SC",ST,USGS,-82.040386,35.1126174,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02154950
+54,54,02155500,"PACOLET RIVER NEAR FINGERVILLE, SC",ST,USGS,-81.9595507,35.10984144,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02155500
+55,55,021556524,"LAKE BLALOCK NEAR COWPENS, SC",ST,USGS,-81.8678816,35.05817815,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=021556524
+56,56,021556525,"PACOLET RIVER BELOW LAKE BLALOCK NEAR COWPENS, SC",ST,USGS,-81.8556592,35.0476231,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=021556525
+57,57,02156300,LAWSONS FORK CREEK AT SPARTANBURG SC,ST,USGS,-81.86871409999999,34.9481803,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02156300
+58,58,02156449,"NEAL SHOALS RESERVOIR NEAR CARLISLE, SC",LK,USGS,-81.4489867,34.664304200000004,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02156449
+59,59,021564493,"BROAD RIVER BELOW NEAL SHOALS RES. NR CARLISLE,SC",ST,USGS,-81.44722220000001,34.66305556,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=021564493
+60,60,02156500,"BROAD RIVER NEAR CARLISLE, SC",ST,USGS,-81.42120890000001,34.5951393,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02156500
+61,61,02157470,"MIDDLE TYGER RIVER NEAR GRAMLING, SC",ST,USGS,-82.21861109999999,35.03888889,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02157470
+62,62,02157510,"MIDDLE TYGER RIVER NEAR LYMAN, SC",ST,USGS,-82.12344209999999,34.940118700000006,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02157510
+63,63,02158408,"SOUTH TYGER RIVER BELOW DUNCAN, SC",ST,USGS,-82.13010899999999,34.92095239,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02158408
+64,64,02160105,"TYGER RIVER NEAR DELTA, SC",ST,USGS,-81.548158,34.535416299999994,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02160105
+65,65,02160325,"BRUSHY CREEK NEAR GREENVILLE, SC",ST,USGS,-82.30122779999999,34.88345068,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02160325
+66,66,02160326,"ENOREE RIVER AT PELHAM, SC",ST,USGS,-82.22622468,34.85650727,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02160326
+67,67,021603273,"ROCKY CREEK NEAR WADE HAMPTON,SC",ST,USGS,-82.2683333,34.85611110000001,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=021603273
+68,68,02160381,"DURBIN CREEK ABOVE FOUNTAIN INN, SC",ST,USGS,-82.1737222,34.71678818,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02160381
+69,69,02160390,"ENOREE RIVER NEAR WOODRUFF, SC",ST,USGS,-82.0398229,34.68345815,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02160390
+70,70,02160700,"ENOREE RIVER AT WHITMIRE, SC",ST,USGS,-81.5981594,34.5093039,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02160700
+71,71,02160990,"PARR SHOALS RESERVOIR AT PARR, SC",ST,USGS,-81.33176359999999,34.26125835,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02160990
+72,72,02160991,"BROAD RIVER NEAR JENKINSVILLE, SC",ST,USGS,-81.3303747,34.26070285,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02160991
+73,73,02161000,"BROAD RIVER AT ALSTON, SC",ST,USGS,-81.319541,34.24320335,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02161000
+74,74,02162035,"BROAD RIVER NEAR COLUMBIA, SC",ST,USGS,-81.0733333,34.048333299999996,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02162035
+75,75,02162093,"SMITH BRANCH AT NORTH MAIN ST AT COLUMBIA, SC",ST,USGS,-81.0417588,34.02737615,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02162093
+76,76,021622845,"SOUTH SALUDA RIVER NEAR ROCKY BOTTOM,SC",ST,USGS,-82.705,35.0608333,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=021622845
+77,77,021622847,"SLICKING CREEK NEAR ROCKY BOTTOM,SC",ST,USGS,-82.6980556,35.06777778,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=021622847
+78,78,02162285,"TABLE ROCK RESERVOIR NR CLEVELAND, SC",LK,USGS,-82.6725,35.06416667,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02162285
+79,79,02162287,"TABLE ROCK RESERVOIR TAILRACE NR CLEVELAND, SC",ST,USGS,-82.66972220000001,35.0622222,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02162287
+80,80,02162290,"SOUTH SALUDA RIVER NEAR CLEVELAND, SC",ST,USGS,-82.65012800000001,35.06345088,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02162290
+81,81,02162350,"MIDDLE SALUDA RIVER NEAR CLEVELAND, SC",ST,USGS,-82.537623,35.1201172,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02162350
+82,82,021623950,"NORTH SALUDA RIVER NEAR HIGHLAND,SC",ST,USGS,-82.3647222,35.1672222,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=021623950
+83,83,021623957,"BIG FALLS CREEK NEAR TIGERVILLE,SC",ST,USGS,-82.4027778,35.17,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=021623957
+84,84,021623961,"NORTH SALUDA RESERVOIR NEAR TIGERVILLE,SC",LK,USGS,-82.40861109999999,35.14166667,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=021623961
+85,85,021623975,"NORTH SALUDA RIVER ABOVE SLATER,SC",ST,USGS,-82.46,35.08388889,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=021623975
+86,86,02162500,"SALUDA RIVER NEAR GREENVILLE, SC",ST,USGS,-82.4806814,34.84233977,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02162500
+87,87,02163001,"SALUDA RIVER NEAR WILLIAMSTON, SC",ST,USGS,-82.44401468,34.614836600000004,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02163001
+88,88,02163500,"SALUDA RIVER NEAR WARE SHOALS, SC",ST,USGS,-82.22345068,34.39178518,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02163500
+89,89,02164000,"REEDY RIVER NEAR GREENVILLE, SC",ST,USGS,-82.3651213,34.800118299999994,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02164000
+90,90,02164110,"REEDY RIVER ABOVE FORK SHOALS, SC",ST,USGS,-82.29761859999999,34.65289568,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02164110
+91,91,021650905,"REEDY RIVER NEAR WATERLOO, SC",ST,USGS,-82.1394444,34.39138889,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=021650905
+92,92,02165200,"SOUTH RABON CREEK NEAR GRAY COURT, SC",ST,USGS,-82.15705140000001,34.52011957,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02165200
+93,93,021652801,"NORTH RABON CREEK NEAR HICKORY TAVERN, SC",ST,USGS,-82.1383333,34.525,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=021652801
+94,94,02166500,"LAKE GREENWOOD NEAR CHAPPELLS, SC",ST,USGS,-81.90817,34.16901923,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02166500
+95,95,02166501,"LAKE GREENWOOD TAILRACE NR CHAPPELLS, SC",ST,USGS,-81.9078923,34.16763036,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02166501
+96,96,02167000,"SALUDA RIVER AT CHAPPELLS, SC",ST,USGS,-81.864002,34.17457619,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02167000
+97,97,02167450,"LITTLE RIVER NR SILVERSTREET, SC",ST,USGS,-81.7631659,34.20957949,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02167450
+98,98,02167582,"BUSH RIVER NR PROSPERITY, SC",ST,USGS,-81.61038399,34.1687501,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02167582
+99,99,02167705,"LITTLE SALUDA RIVER NEAR SALUDA, SC",ST,USGS,-81.697051,34.04458079,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02167705
+100,100,02168500,"LAKE MURRAY NEAR COLUMBIA, SC",ST,USGS,-81.22065329,34.052093,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02168500
+101,101,02168501,"LAKE MURRAY TAILRACE NEAR COLUMBIA, SC",ST,USGS,-81.2167642,34.053482,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02168501
+102,102,02168504,"SALUDA RIVER BELOW LK MURRAY DAM NR COLUMBIA, SC",ST,USGS,-81.2095418,34.05098220000001,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02168504
+103,103,02168900,"SALUDA RIVER AT I-20, NEAR COLUMBIA,SC",ST,USGS,-81.1278729,34.0259846,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02168900
+104,104,02169000,"SALUDA RIVER NEAR COLUMBIA, SC",ST,USGS,-81.08787170000001,34.014041600000006,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02169000
+105,105,02169500,"CONGAREE RIVER AT COLUMBIA, SC",ST,USGS,-81.049815,33.99320985,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02169500
+106,106,02169506,"ROCKY BRANCH @ WHALEY ST. AT COLUMBIA, SC",ST,USGS,-81.0275,33.9875,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02169506
+107,107,02169568,"PEN BRANCH AT COLUMBIA, SC",ST,USGS,-80.982035,34.01293324,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02169568
+108,108,02169570,"GILLS CREEK AT COLUMBIA, SC",ST,USGS,-80.97425729999999,33.98960016,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02169570
+109,109,02169625,"CONGAREE RIVER AT CONGAREE NP NEAR GADSDEN, SC",ST,USGS,-80.8670348,33.81071,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02169625
+110,110,02169672,"CEDAR CREEK AT CONGAREE NP NEAR GADSDEN, SC",ST,USGS,-80.82731209999999,33.81626536,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02169672
+111,111,02169810,"SANTEE R AT TREZESVANTS LANDING NR FT MOTTE, SC",ST,USGS,-80.62842090000001,33.73126819,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02169810
+112,112,02169921,"LAKE MARION NEAR ELLOREE, SC",LK,USGS,-80.50425290000001,33.55210719,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02169921
+113,113,02171000,"LAKE MARION NEAR PINEVILLE, SC",ST,USGS,-80.1636949,33.4501652,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02171000
+114,114,02171001,"SANTEE RIVER @ LK MARION TAILRACE NR PINEVILLE, SC",ST,USGS,-80.1636949,33.4501652,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02171001
+115,115,02171500,"SANTEE RIVER NEAR PINEVILLE, SC",ST,USGS,-80.14147189,33.45433217,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02171500
+116,116,02171635,"LK MOULTRIE AT REDIVERSION NR RUSSELLVILLE, SC",LK,USGS,-79.9975,33.39888889,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02171635
+117,117,02171645,"REDIV CANAL AT SANTEE RIVER NR ST STEPHEN, SC",ST,USGS,-79.915,33.4275,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02171645
+118,118,02171700,"SANTEE RIVER NR JAMESTOWN, SC",ST,USGS,-79.67812629999999,33.3048893,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02171700
+119,119,02171800,"NORTH SANTEE RIVER NR NORTH SANTEE, SC",ES,USGS,-79.38255799999999,33.20850056,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02171800
+120,120,02171850,"SOUTH SANTEE RIVER NR MCCLELLANVILLE, SC",ES,USGS,-79.4058929,33.1840565,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02171850
+121,121,02171905,"S. SANTEE R @ STATE PIER NR MCCLELLANVILLE, SC",ST,USGS,-79.3542237,33.15433435,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02171905
+122,122,02172000,"LAKE MOULTRIE NEAR PINOPOLIS, SC",LK,USGS,-79.991469,33.24461337,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02172000
+123,123,02172001,"LAKE MOULTRIE NEAR PINOPOLIS, SC (TAILRACE)",LK,USGS,-79.991469,33.24461337,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02172001
+124,124,02172002,"LAKE MOULTRIE TAILRACE CANAL AT MONCKS CORNER, SC",ST,USGS,-79.9745248,33.21516925,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02172002
+125,125,02172020,"W BRANCH COOPER R @ PIMLICO NR MONCKS CORNER, SC",ST,USGS,-79.9489708,33.0935042,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02172020
+126,126,02172035,"TURKEY CREEK ABOVE HUGER, SC",ST,USGS,-79.7836887,33.131558399999996,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02172035
+127,127,02172040,"BACK RIVER AT DUPONT INTAKE NR KITTREDGE, SC",ST,USGS,-79.957027,33.06378245,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02172040
+128,128,02172050,"COOPER R NR GOOSE CREEK, SC",ES,USGS,-79.93619338,33.05767134,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02172050
+129,129,021720508,"COOPER RIVER ABOVE GOOSE CREEK,SC",OC-CO,USGS,-79.90675,33.01577778,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=021720508
+130,130,02172053,"COOPER R AT MOBAY NR N CHARLESTON, SC",ST,USGS,-79.92286120000001,32.9835058,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02172053
+131,131,021720677,"COOPER RIVER @ FILBIN CREEK @ NORTH CHARLESTON, SC",ST,USGS,-79.9628645,32.89045228,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=021720677
+132,132,0217206935,"COOPER RVR @ PORTS AUTHORITY PIER K, CHARLESTON SC",OC-CO,USGS,-79.9526667,32.85569444,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=0217206935
+133,133,0217206962,"WANDO RIVER AT CAINHOY BELOW WANDO,SC",OC-CO,USGS,-79.83269440000001,32.92427778,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=0217206962
+134,134,021720698,"WANDO RIVER ABOVE MT PLEASANT, SC",ES,USGS,-79.8961963,32.8590638,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=021720698
+135,135,021720709,"COOPER RIVER AT U.S. HWY 17 AT CHARLESTON, SC",ST,USGS,-79.91008690000001,32.80239835,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=021720709
+136,136,021720710,"COOPER RVR @ CUSTOMS HOUSE (AUX) @ CHARLESTON, SC",ST,USGS,-79.923699,32.780454399999996,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=021720710
+137,137,021720711,"COOPER RIVER AT CUSTOMS HOUSE AT CHARLESTON, SC",ST,USGS,-79.923699,32.780454399999996,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=021720711
+138,138,021720825,"ASHLEY RIVER BELOW SUMMERVILLE, SC",OC-CO,USGS,-80.1516667,32.92583333,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=021720825
+139,139,021720869,"ASHLEY RIVER NEAR NORTH CHARLESTON, SC",ES,USGS,-80.02370140000001,32.8346201,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=021720869
+140,140,02172300,"MCTIER CREEK (RD 209) NEAR MONETTA, SC",ST,USGS,-81.6017714,33.75347736,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02172300
+141,141,02172558,"SOUTH FORK EDISTO RIVER ABOVE SPRINGFIELD,SC",ST,USGS,-81.41027779999999,33.52027778,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02172558
+142,142,02173000,"SOUTH FORK EDISTO RIVER NEAR DENMARK, SC",ST,USGS,-81.1331559,33.39320916,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02173000
+143,143,02173030,"SOUTH FORK EDISTO RIVER NEAR COPE, SC",ST,USGS,-81.0595425,33.3590442,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02173030
+144,144,02173051,"SOUTH FORK EDISTO RIVER NEAR BAMBERG, SC",ST,USGS,-81.01870799999999,33.33710079,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02173051
+145,145,02173212,"CEDAR CREEK NEAR THOR, SC",ST,USGS,-81.2541667,33.69,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02173212
+146,146,02173500,"NORTH FORK EDISTO RIVER AT ORANGEBURG, SC",ST,USGS,-80.87342578,33.48348715,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02173500
+147,147,02174045,"EDISTO RIVER AT I-95, ABOVE CANADYS,SC",ST,USGS,-80.64972220000001,33.09027778,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02174045
+148,148,02175000,"EDISTO RIVER NR GIVHANS, SC",ST,USGS,-80.39148759999999,33.02794645,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02175000
+149,149,02175500,"SALKEHATCHIE RIVER NEAR MILEY, SC",ST,USGS,-81.0526044,32.98904958,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02175500
+150,150,02176500,"COOSAWHATCHIE RIVER NEAR HAMPTON, SC",ST,USGS,-81.1317718,32.836277700000004,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02176500
+151,151,02177000,"CHATTOOGA RIVER NEAR CLAYTON, GA",ST,USGS,-83.305993,34.8139814,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02177000
+152,152,02186000,"TWELVEMILE CREEK NEAR LIBERTY, SC",ST,USGS,-82.74847249999999,34.801501200000004,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02186000
+153,153,02186702,"EIGHTEENMILE CREEK BELOW PENDLETON,SC",ST,USGS,-82.8005556,34.645,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02186702
+154,154,02187010,"HARTWELL LAKE NEAR ANDERSON, SC",LK,USGS,-82.8552778,34.5083333,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02187010
+155,155,02187910,"ROCKY RIVER NR STARR, SC",ST,USGS,-82.577352,34.38316394,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02187910
+156,156,02188100,"RUSSELL LAKE ABOVE CALHOUN FALLS, SC",LK,USGS,-82.6180556,34.101111100000004,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02188100
+157,157,02192500,"LITTLE RIVER NEAR MT. CARMEL, SC",ST,USGS,-82.5006853,34.07150595,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02192500
+158,158,02193900,"THURMOND LAKE NEAR PLUM BRANCH, SC",LK,USGS,-82.345,33.84166667,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02193900
+159,159,02195520,"SAVANNAH RIVER NEAR EVANS, GA",ST,USGS,-82.12317459,33.592911799999996,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02195520
+160,160,02196000,"STEVENS CREEK NEAR MODOC, SC",ST,USGS,-82.1817873,33.72929717,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02196000
+161,161,02196483,"SAVANNAH RVR AT STEVENS CREEK DAM NR MORGANA, SC",LK,USGS,-82.0509506,33.5629124,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02196483
+162,162,02196485,"AUGUSTA CANAL NR AUGUSTA, GA (UPPER)",ST,USGS,-82.03678359999999,33.54930154,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02196485
+163,163,02196690,"HORSE CREEK AT CLEARWATER, SC",ST,USGS,-81.90761399,33.4781928,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02196690
+164,164,02196999,SAVANNAH RV ABOVE NEW SAV. LOCK AND DAM,LK,USGS,-81.9420599,33.37319627,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02196999
+165,165,02197000,"SAVANNAH RIVER AT AUGUSTA, GA",ST,USGS,-81.94289329,33.3737518,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02197000
+166,166,02197300,"UPPER THREE RUNS NEAR NEW ELLENTON, SC",ST,USGS,-81.61649799999999,33.3848664,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02197300
+167,167,02197500,"SAVANNAH R AT BURTONS FERRY BR NR MILLHAVEN, GA",ST,USGS,-81.50260779999999,32.93904727,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02197500
+168,168,02198375,"SAVANNAH RIVER NEAR ESTILL, SC",ST,USGS,-81.42833329999999,32.70333333,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02198375
+169,169,02198500,"SAVANNAH RIVER NEAR CLYO, GA",ST,USGS,-81.26871649,32.52823709,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02198500
+170,170,02198760,"SAVANNAH RIVER ABOVE HARDEEVILLE, SC",ST,USGS,-81.12844379,32.33936049,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=02198760
+171,171,021989784,"L BACK RIVER ABOVE LUCKNOW CANAL, NR LIMEHOUSE, SC",ST,USGS,-81.11789,32.18575747,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=021989784
+172,172,021989791,"LITTLE BACK RIVER AT F&W DOCK, NEAR LIMEHOUSE, SC",ES,USGS,-81.1181677,32.1707582,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=021989791
+173,173,0219897993,"SAVANNAH RIVER AT ELBA ISLAND, NEAR SAVANNAH, GA",ST,USGS,-81.0069444,32.10305556,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=0219897993
+174,174,330428079214800,"SKRINE CREEK NEAR MCCLELLENVILLE,SC",OC-CO,USGS,-79.3633333,33.07444444,https://waterdata.usgs.gov/nwis/inventory?agency_code=USGS&site_no=330428079214800
