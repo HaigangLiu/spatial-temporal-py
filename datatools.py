@@ -12,7 +12,8 @@ class dailyToMonthlyConverter:
         dtype_dict (dict): a dictionary of data type
         agg_ops(dict): a dictionary of aggregation operations from daily record to monthly.
             Example: {'NEW_PRCP': [np.max, 'PRCP']}
-            NEW_PRCP is the new variable name, and np.max is the name of aggregation, and 'PRCP' is the original name in the daily record
+            NEW_PRCP is the new variable name, and np.max is the 
+            name of aggregation, and 'PRCP' is the original name in the daily record
         station_column (str): name of the columnn of station name.
         date_column (str): name of the columnn of station name.
     '''
@@ -23,7 +24,6 @@ class dailyToMonthlyConverter:
 
         if dtype_dict is None:
             self.dtype_dict = {'STATION': str,
-                                # 'STATION_NAME': str,
                                 'ELEVATION': float,
                                 'LATITUDE': float,
                                 'LONGITUDE': float,
@@ -93,7 +93,6 @@ class dailyToMonthlyConverter:
         return output_df
 
     def multiple_file_handler(self, file_list_ = None, multiprocessing = True):
-
         '''
         Args:
             multiprocessing (boolean): Use multiple processing or not. The default is on.
