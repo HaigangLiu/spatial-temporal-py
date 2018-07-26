@@ -101,11 +101,11 @@ if __name__ == '__main__':
     nc_mask_dir = '/Users/haigangliu/Dropbox/DataRepository/data_file_new/lsmask.nc'
     nc_data_dir = '/Users/haigangliu/Dropbox/DissertationCode/sst/sst.mnmean.nc'
 
-    os.chdir('/Users/haigangliu/Dropbox/DissertationCode/synthetic_data/')
-    new_df = pd.read_csv('monthly_rainfall.csv')
+    new_df = pd.read_csv('./data/monthly_rainfall.csv')
 
     locs = new_df.groupby('STATION').first().reset_index()[['STATION','LONGITUDE', 'LATITUDE', 'ELEVATION']]
     lats_and_lons = locs[['LONGITUDE', 'LATITUDE']]
 
     test_case = SSTcalculator(nc_data_dir, nc_mask_dir)
     s = test_case.look_up_engine('2011-10', '2012-12', lats_and_lons)
+    print(s)
