@@ -101,16 +101,16 @@ class RangeSelector:
 
 if __name__ == '__main__':
 
-    target_dir = '/Users/haigangliu/Dropbox/DissertationCode/synthetic_data/monthly_rainfall.csv'
+    target_dir = './data/monthly_rainfall.csv'
     nc_mask_dir = '/Users/haigangliu/Dropbox/DataRepository/data_file_new/lsmask.nc'
     nc_data_dir = '/Users/haigangliu/Dropbox/DissertationCode/sst/sst.mnmean.nc'
 
-    save_dir = '/Users/haigangliu/Dropbox/DissertationCode/synthetic_data/with_sst_5_years.csv'
-    save_dir2 = '/Users/haigangliu/Dropbox/DissertationCode/synthetic_data/with_sst_5_years_flat_and_wide.csv'
+    save_dir = '/Users/haigangliu/Dropbox/DissertationCode/synthetic_data/with_sst_1_year.csv'
+    save_dir2 = '/Users/haigangliu/Dropbox/DissertationCode/synthetic_data/with_sst_1_year_flat_and_wide.csv'
 
     monthly_rain = pd.read_csv(target_dir)
 
-    selector = RangeSelector(monthly_rain, '2011-01', '2015-12')
+    selector = RangeSelector(monthly_rain, '2015-01', '2015-12')
     merged_table = selector.merge_with_sst(nc_data_dir, nc_mask_dir)
     merged_table_flat_and_wide = selector.flip_to_flat_and_wide()
     print(merged_table_flat_and_wide.head())
