@@ -11,7 +11,8 @@ def load_rainfall_data(option = 'monthly'):
 
     elif option == 'daily':
         retained_var_list = ['STATION','ELEVATION', 'LATITUDE', 'LONGITUDE', 'DATE','PRCP', 'TMAX', 'TMIN']
-        daily_data =  pd.read_csv('./data/daily_rainfall_with_region_label.csv', parse_dates=['DATE'], date_parser= pd.to_datetime)
+        daily_data =  pd.read_csv('./data/daily_rainfall_with_region_label.csv',
+            parse_dates=['DATE'], date_parser= pd.to_datetime)
         sample_data = daily_data.loc[daily_data.DATE == pd.to_datetime('2015-10-03'), retained_var_list]
         print('This is the rainfall data on October 3, 2015.')
         print('Additional info includes temperature (max, min and mean).')
@@ -36,8 +37,7 @@ def load_flood_data(option = 'monthly'):
     elif option  == 'daily':
         retained_var_list = ['SITENUMBER', 'DATE','LATITUDE', 'LONGITUDE', 'GAGE_MAX']
         daily_data = pd.read_csv('./data/flood_data_daily.csv', dtype = {'SITENUMBER': str, 'GAGE_MAX': float},
-            parse_dates=['DATE'], na_values = ['Eqp'],
-            date_parser= pd.to_datetime)
+            parse_dates=['DATE'], na_values = ['Eqp'], date_parser= pd.to_datetime)
         daily_data = daily_data.loc[daily_data.DATE == pd.to_datetime('2015-10-03'), retained_var_list]
         sample_data = daily_data[retained_var_list].reset_index(drop = True)
         print(f'This is the flood data on October 3, 2015.')
