@@ -1,26 +1,79 @@
 import pandas as pd
 
-pd.read_csv('./data/NWISMapperExport.csv')
+def load_rainfall_data(option = 'monthly'):
+    if option == 'monthly':
+        retained_var_list = ['STATION','YEAR', 'MONTH','LATITUDE','LONGITUDE', 'PRCP', 'SST']
+        monthly_data = pd.read_csv('./data/with_sst_1_year.csv')[retained_var_list]
+        sample_data = monthly_data[(monthly_data.YEAR == 2015) &(monthly_data.MONTH == 10)]
+        print(f'This is the rainfall data on October 2015 with location information along with temperature and sea surface temperature data. There are {len(sample_data)} records.')
 
-
-def load_sample_data_spatial(data_type = 'rain'):
-
-    if data_type = 'rain':
-
-        print('This is the rainfall data on October 2015 with location information along with temperature and sea surface temperature data')
-        monthly_rain = pd.read_csv('./data/with_sst_1_year.csv', index_col = 0)[['STATION','MONTH','YEAR','LATITUDE','LONGITUDE', 'PRCP', 'SST',]]
-        sample_data = monthly_rain[(monthly_rain.YEAR == 2015) &(monthly_rain.MONTH == 10)].reset_index(drop = True)
-    elif:
-        pass
+    elif option == 'daily':
+        retained_var_list = ['STATION','ELEVATION', 'LATITUDE', 'LONGITUDE', 'DATE','PRCP', 'TMAX', 'TMIN']
+        daily_data =  pd.read_csv('./data/daily_rainfall_with_region_label.csv', parse_dates=['DATE'], date_parser= pd.to_datetime)
+        sample_data = daily_data.loc[daily_data.DATE == pd.to_datetime('2015-10-03'), retained_var_list]
+        print(f'This is the rainfall data on October 3, 2015 with location information with temperature data. There are {len(sample_data)} records.')
+        return sample_data
 
     else:
-        raise ValueError('data_type only allow either rain or flood')
+        raise ValueError(f'options only accepts monthly or daily. {option} is not available.')
+        return None
+
+    return sample_data.reset_index(drop = True)
+
+def load_flood_data(option = 'monthly'):
+    if option == 'monthly':
+        retained_var_list = ['SITENUMBER', 'YEAR', 'MONTH','LATITUDE', 'LONGITUDE', 'GAGE_MAX']
+        data_frame = pd.read_csv('./data/flood_data_1_year.csv', index_col = 0)
+        sample_data = data_frame[(data_frame.YEAR == 2015) & (data_frame.MONTH == 10)]
+        sample_data = sample_data[retained_var_list].reset_index(drop = True)
+        print(f'This is the flood data on October 2015 with location information. There are {len(sample_data)} records.')
+
+    elif option  == 'daily':
+        retained_var_list = ['SITENUMBER', 'DATE','LATITUDE', 'LONGITUDE', 'GAGE_MAX']
+        daily_data = pd.read_csv('./data/flood_data_daily.csv', dtype = {'SITENUMBER': str, 'GAGE_MAX': float}, parse_dates=['DATE'], na_values = ['Eqp'], date_parser= pd.to_datetime)
+        daily_data = daily_data.loc[daily_data.DATE == pd.to_datetime('2015-10-03'), retained_var_list]
+        sample_data = daily_data[retained_var_list].reset_index(drop = True)
+        print(f'This is the flood data on October 3, 2015 with location information. There are {len(sample_data)} records.')
+    else:
+        raise ValueError(f'options only accepts monthly or daily. {option} is not available.')
+        return None
     return sample_data
 
-def load_sample_data_spatial_temporal(flat_and_wide = False):
-    print('This is the rainfall data from 2010 Januaray to 2015 December with location information')
-    if flat_and_wide:
-        sample_data = pd.read_csv('./data/with_sst_5_years_flat_and_wide.csv', index_col = 0)
+def load_flood_data_spatial_temporal(option = 'five-year'):
+
+    retained_var_list =[ 'SITENUMBER',  'YEAR', 'MONTH', 'LATITUDE', 'LONGITUDE', 'GAGE_MAX']
+    if option == 'one-year':
+        sample_data = pd.read_csv('./data/flood_data_1_year.csv', dtype = {'SITENUMBER': str})[retained_var_list]
+    elif option == 'five-year':
+        sample_data = pd.read_csv('./data/flood_data_5_years.csv', dtype = {'SITENUMBER': str})[retained_var_list]
     else:
-        sample_data = pd.read_csv('./data/with_sst_5_years.csv', index_col = 0)
+        raise ValueError(f'only accepts one-month or five-month. {option} is not available.')
+        return None
     return sample_data
+
+def load_rainfall_data_spatial_temporal(option = 'five-year'):
+
+    retained_var_list = ['STATION','YEAR', 'MONTH','LATITUDE','LONGITUDE', 'PRCP', 'SST']
+    if option == 'one-year':
+        sample_data = pd.read_csv('./data/with_sst_1_year.csv')[retained_var_list]
+        more_info = 'year 2015'
+    elif option == 'five-year':
+        sample_data = pd.read_csv('./data/with_sst_5_years.csv')[retained_var_list]
+        more_info = '2011 - 2015'
+    else:
+        raise ValueError(f'only accepts one-month or five-month. {option} is not available.')
+        return None
+    print(f'This is the rainfall data of {option} : {more_info}. There are {len(sample_data)} records.')
+    return sample_data
+
+if __name__ == '__main__':
+
+    s1 = load_flood_data('monthly')
+    s2 = load_flood_data('daily')
+    s3 = load_rainfall_data('monthly')
+    s4 = load_rainfall_data('daily')
+
+    s5 = load_rainfall_data_spatial_temporal('one-year')
+    s6 = load_flood_data_spatial_temporal('one-year')
+    s7 = load_rainfall_data_spatial_temporal('five-year')
+    s8 = load_flood_data_spatial_temporal('five-year')
