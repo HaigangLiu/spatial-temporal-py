@@ -58,13 +58,11 @@ def load_flood_data_spatial_temporal(option = 'five-year'):
     retained_var_list =[ 'SITENUMBER',  'YEAR', 'MONTH', 'LATITUDE', 'LONGITUDE', 'GAGE_MAX']
 
     if option == 'one-year':
-        sample_data = pd.read_csv('./data/flood_data_1_year.csv',
-                                  dtype = {'SITENUMBER': str})[retained_var_list]
+        sample_data = pd.read_csv('./data/flood_data_1_year.csv',dtype = {'SITENUMBER': str})[retained_var_list]
         more_info = 'year 2015'
 
     elif option == 'five-year':
-        sample_data = pd.read_csv('./data/flood_data_5_years.csv',
-                                  dtype = {'SITENUMBER': str})[retained_var_list]
+        sample_data = pd.read_csv('./data/flood_data_5_years.csv', dtype = {'SITENUMBER': str})[retained_var_list]
         more_info = '2011 - 2015'
 
     else:
