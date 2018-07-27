@@ -21,7 +21,7 @@ class PlotDataOnMap:
 
         self.locations = locations[['LATITUDE', 'LONGITUDE']]
         if map_file is None:
-            self.map_file = '/Users/haigangliu/SpatialTemporalBayes/data/shape_file/south_carolina/tl_2010_45_state10.shp'
+            self.map_file = os.path.join(os.getcwd(),'data/shape_file/south_carolina/tl_2010_45_state10.shp')
         else:
             self.map_file = map_file
         shape = fiona.open(self.map_file)
