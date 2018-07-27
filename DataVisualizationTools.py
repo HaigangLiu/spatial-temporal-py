@@ -1,11 +1,8 @@
 import fiona
 import folium
-import matplotlib.pyplot as plt
 import numpy as np
 import pandas as pd
 import os
-import time
-import numpy as np
 import webbrowser
 
 class PlotDataOnMap:
@@ -98,13 +95,8 @@ class PlotDataOnMap:
         return self.map
 
 if __name__ == '__main__':
-
-
     from SampleDataLoader import load_rainfall_data
     r = load_rainfall_data()
-    print(r.columns)
-    print(r[['LATITUDE', 'LONGITUDE']])
-
     plotter = PlotDataOnMap(r[['LATITUDE', 'LONGITUDE']])
-    # s = plotter.plot_locations()
+    s1 = plotter.plot_locations()
     s2 = plotter.plot_variable_values(variable = r['PRCP'], size_multiplier = 2)
