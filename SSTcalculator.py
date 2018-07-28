@@ -6,7 +6,7 @@ from scipy.spatial import cKDTree
 
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
-
+from utilities_functions import coordinates_converter
 class SSTcalculator:
 
     def __init__(self, nc_data_dir, nc_mask_dir):
@@ -26,20 +26,6 @@ class SSTcalculator:
 
         self.lons = np.array([term if term <= 180 else (term -360) for term in self.lons])
 
-    @staticmethod
-    def _lat_lon_to_cartesian(lon, lat, R = 3959):
-        """
-        Asssuming that earth is a perfect sphere.
-        calculates lon, lat coordinates of a point on a sphere with radius R.
-        The radius of earth is 3959
-        """
-        lon_r = np.radians(lon)
-        lat_r = np.radians(lat)
-
-        x =  R * np.cos(lat_r) * np.cos(lon_r)
-        y = R * np.cos(lat_r) * np.sin(lon_r)
-        z = R * np.sin(lat_r)
-        return x, y, z
 
     def _month_locator(self, starting_date, end_date):
         time_values = self.nc_data.variables['time'][:]
@@ -60,11 +46,10 @@ class SSTcalculator:
         sst_df_sea_only_ = sst_df_sea_only.stack().reset_index()
         sst_df_sea_only_.columns = ['LATITUDE', 'LONGITUDE', 'SST']
 
-        x, y, z = self._lat_lon_to_cartesian(sst_df_sea_only_.LONGITUDE, sst_df_sea_only_.LATITUDE)
-        tree = cKDTree(np.array(list(zip(x, y, z))))
-
-        x1, y1, z1 = self._lat_lon_to_cartesian(spatial_points.LONGITUDE, spatial_points.LATITUDE)
-        distances, idx = tree.query(np.array(list(zip(x1, y1, z1))), k = n_neighbors)
+        cartesian_coord_trees = coordinates_converter(sst_df_sea_only_)
+        tree = cKDTree(cartesian_coord_trees.values)
+        cartesian_coord_query = coordinates_converter(spatial_points)
+        distances, idx = tree.query(cartesian_coord_query.values, k = n_neighbors)
 
         sst_list = []
         for i in range(len(spatial_points)):
@@ -108,4 +93,3 @@ if __name__ == '__main__':
 
     test_case = SSTcalculator(nc_data_dir, nc_mask_dir)
     s = test_case.look_up_engine('2011-10', '2012-12', lats_and_lons)
-    print(s)
