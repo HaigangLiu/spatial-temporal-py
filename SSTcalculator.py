@@ -7,6 +7,7 @@ from scipy.spatial import cKDTree
 from datetime import datetime
 from dateutil.relativedelta import relativedelta
 from utilities_functions import coordinates_converter
+
 class SSTcalculator:
 
     def __init__(self, nc_data_dir, nc_mask_dir):
@@ -83,12 +84,12 @@ class SSTcalculator:
 
 if __name__ == '__main__':
 
-    nc_mask_dir = '/Users/haigangliu/Dropbox/DataRepository/data_file_new/lsmask.nc'
-    nc_data_dir = '/Users/haigangliu/Dropbox/DissertationCode/sst/sst.mnmean.nc'
+    nc_mask_dir = './data/lsmask.nc'
+    nc_data_dir = './data/sst.mnmean.nc'
 
-    new_df = pd.read_csv('./data/monthly_rainfall.csv')
-
-    locs = new_df.groupby('STATION').first().reset_index()[['STATION','LONGITUDE', 'LATITUDE', 'ELEVATION']]
+    from SampleDataLoader import load_rainfall_data
+    new_df = load_rainfall_data()
+    locs = new_df.groupby('STATION').first().reset_index()[['STATION','LONGITUDE', 'LATITUDE']]
     lats_and_lons = locs[['LONGITUDE', 'LATITUDE']]
 
     test_case = SSTcalculator(nc_data_dir, nc_mask_dir)
