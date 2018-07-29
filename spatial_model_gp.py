@@ -113,3 +113,4 @@ if __name__ == '__main__':
     print(gp_spatial_model.summary)
     print(gp_spatial_model.y_test)
     print(gp_spatial_model.predictions)
+    #{'l1_loss': 2.4585309225114274, 'l2_loss': 11.003350489559711}
