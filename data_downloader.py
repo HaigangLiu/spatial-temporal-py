@@ -87,7 +87,7 @@ class DailyFloodDataDownloader:
         number_of_records = all_stations_df.shape[0]
         number_of_locs = len(np.unique(all_stations_df['SITENUMBER']))
 
-        print(f'There are {number_of_locs} locations and {number_of_records} in total.')
+        print(f'There are {number_of_locs} locations and {number_of_records} entries in total.')
 
         return all_stations_df
 
