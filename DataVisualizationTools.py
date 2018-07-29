@@ -4,6 +4,9 @@ import numpy as np
 import pandas as pd
 import os
 import webbrowser
+import pickle
+from spatial_model_gp import GPModelSpatial
+import matplotlib.pyplot as plt
 
 class PlotDataOnMap:
     '''
@@ -17,9 +20,11 @@ class PlotDataOnMap:
         variable(pandas series): the spatially indexed variable. e.g. rainfall value or flood.
     '''
 
-    def __init__(self, locations, map_file = None):
+    def __init__(self, locations, variable = None, map_file = None):
 
         self.locations = locations[['LATITUDE', 'LONGITUDE']]
+        self.variable = variable
+
         if map_file is None:
             self.map_file = os.path.join(os.getcwd(),'data/shape_file/south_carolina/tl_2010_45_state10.shp')
         else:
@@ -40,7 +45,7 @@ class PlotDataOnMap:
         else:
             marker_cluster = MarkerCluster(icons="dd").add_to(self.map)
             for coord in self.locs:
-                folium.Marker(location=[ coord[0], coord[1]]).add_to(marker_cluster)
+                folium.Marker(location = coord).add_to(marker_cluster)
 
         if contoured:
             folium.GeoJson(
@@ -58,9 +63,9 @@ class PlotDataOnMap:
             webbrowser.open('file://' + os.path.realpath(output_path))
         return self.map
 
-    def plot_variable_values(self, variable, contoured = True, open_in_browser = True, size_multiplier = 1):
+    def plot_variable_values(self, contoured = True, open_in_browser = True, size_multiplier = 1):
 
-        for value, location in zip(variable, self.locations.values):
+        for value, location in zip(self.variable, self.locations.values):
 
             if value >= 0:
                 folium.CircleMarker(location= location,
@@ -94,9 +99,54 @@ class PlotDataOnMap:
             webbrowser.open('file://' + os.path.realpath(output_path))
         return self.map
 
+
+
+def diagnosis_plot_error_bars_spatial(spatial_model, upper_percentile = 95, lower_percentile = 5, figname = None):
+
+    simulated_values = spatial_model.simulated_values['y']
+    real_values = spatial_model.Y_new
+    predictions = spatial_model.predictions
+
+    upper_bound = np.exp(np.percentile(simulated_values, upper_percentile, axis = 0))
+    lower_bound = np.exp(np.percentile(simulated_values, lower_percentile, axis = 0))
+
+    x = list(range(len(real_values)))
+    errorbar_length = 0.5*(upper_bound - lower_bound)
+
+    fig = plt.figure()
+    plt.plot(x, real_values, "ro", alpha = 0.5)
+    plt.errorbar(x, predictions, errorbar_length, fmt = "o", alpha = 0.5)
+
+    if figname:
+        assert figname.endswith('.png'), 'needs a .png file extension.'
+        fig.savefig(figname)
+        print(f'the traceplot has been saved to {os.path.join(os.getcwd(), figname)}')
+    return fig
+
+
 if __name__ == '__main__':
+
+    # ------ this is for raw data -------
+    # from SampleDataLoader import load_rainfall_data
+    # r = load_rainfall_data()
+    # plotter = PlotDataOnMap(r[['LATITUDE', 'LONGITUDE']],r.PRCP )
+    # s1 = plotter.plot_locations()
+    # s2 = plotter.plot_variable_values(size_multiplier = 2)
+
+    # ------ this is for residuals data -------
+
     from SampleDataLoader import load_rainfall_data
-    r = load_rainfall_data()
-    plotter = PlotDataOnMap(r[['LATITUDE', 'LONGITUDE']])
-    s1 = plotter.plot_locations()
-    s2 = plotter.plot_variable_values(variable = r['PRCP'], size_multiplier = 2)
+    with open('result.pickle', 'rb') as handler:
+        result_from_pickle = pickle.load(handler)
+
+    loc = result_from_pickle.test_loc_cache
+    predictions = result_from_pickle.predictions
+    real_values = result_from_pickle.Y_new
+
+    plotter2 = PlotDataOnMap(variable = predictions - real_values, locations = loc)
+    figure = plotter2.plot_variable_values(size_multiplier = 2)
+
+    fig2 = diagnosis_plot_error_bars_spatial(result_from_pickle, figname = 'test.png')
+
+    print(predictions)
+    print(real_values)
