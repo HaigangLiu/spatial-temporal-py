@@ -21,7 +21,7 @@ class GPModelSpatialSparse:
 
         X = coordinates_converter(df).values
         self.response_var = response_var
-        y = np.log(df[self.response_var].values)
+        y = df[self.response_var].values
 
         all_index = list(range(len(df)))
         train_size  = int(round(len(df)*spilt_ratio,0))
@@ -35,10 +35,10 @@ class GPModelSpatialSparse:
         self.train_loc_cache = df.loc[train_index, ['LATITUDE','LONGITUDE']]
         self.test_loc_cache = df.loc[test_index, ['LATITUDE','LONGITUDE']]
 
-    def fit(self, sampling_size = 5000, trace_plot_name = None):
+    def fit(self, size = 5000, nodes = 10, traceplot_name = None):
         '''
         Args:
-            sampling_size (int): the length of markov chain
+            size (int): the length of markov chain
             create_traceplot (boolean): Whether or not generate the traceplot.
         '''
         self.model = pm.Model()
@@ -49,23 +49,22 @@ class GPModelSpatialSparse:
             cov = eta**2 * pm.gp.cov.Matern52(3, tau)
 
             self.gp = pm.gp.MarginalSparse(cov_func = cov, approx="VFE")
-            Xu = pm.gp.util.kmeans_inducing_points(10, self.X_train)
+            Xu = pm.gp.util.kmeans_inducing_points(nodes, self.X_train)
 
             sigma = pm.HalfNormal('sigma', sd = 4)
-            y_ = self.gp.marginal_likelihood("y", X= self.X_train,
-                Xu=Xu, y= self.y_train, noise= sigma)
+            y_ = self.gp.marginal_likelihood("y", X= self.X_train, Xu=Xu, y= np.log(self.y_train), noise= sigma)
 
             start = pm.find_MAP()
-            self.trace = pm.sample(sampling_size, start = start )
+            self.trace = pm.sample(size, start = start )
 
-        if trace_plot_name:
+        if traceplot_name:
             fig, axs = plt.subplots(3, 2) # 2 RVs
             pm.traceplot(self.trace, varnames = ['tau', 'eta', 'sigma'], ax = axs)
-            fig.savefig(trace_plot_name)
-            fig_path = os.path.join(os.getcwd(), trace_plot_name)
+            fig.savefig(traceplot_name)
+            fig_path = os.path.join(os.getcwd(), traceplot_name)
             print(f'the traceplot has been saved to {fig_path}')
 
-    def predict(self, new_df = None):
+    def predict(self, new_df = None, sample_size = 1000):
         '''
         Args:
             new_df (pandas dataframe): the dataframe of new locations. Users can also include the truth value of Y.
@@ -82,26 +81,28 @@ class GPModelSpatialSparse:
 
         with self.model:
             y_pred = self.gp.conditional("y_pred", self.X_test)
-            self.simulated_values = pm.sample_ppc(self.trace, vars=[y_pred], samples= 1000)
+            self.simulated_values = pm.sample_ppc(self.trace, vars=[y_pred], samples= sample_size)
             self.predictions = np.exp(np.median(self.simulated_values['y_pred'], axis = 0))
 
         l1_loss = np.mean(np.abs(self.predictions - self.y_test))
         l2_loss = np.mean(np.square(self.predictions - self.y_test))
         self.summary = {'l1_loss': l1_loss, 'l2_loss': l2_loss}
 
-        return self.predictions
+        output_df = self.test_loc_cache.copy()
+        output_df['PRED'] = self.predictions
+
+        return output_df
 
 if __name__ == '__main__':
 
     from SampleDataLoader import load_rainfall_data
     data = load_rainfall_data('monthly')
-    data_list = list(range(len(data)))
 
-    test_case = GPModelSpatialSparse(data, 'PRCP')
-    test_case.fit(trace_plot_name = 'test_traceplot_sparse.png')
-    vars_ = test_case.predict()
+    sparse_gp_model = GPModelSpatialSparse(data, 'PRCP')
+    sparse_gp_model.fit(size = 20000, nodes = 15, traceplot_name = 'test_traceplot_sparse.png')
+    output_df = sparse_gp_model.predict()
 
     import pickle
     with open('result_sparse.pickle', 'wb') as handler:
-        pickle.dump(test_case, handler, protocol=pickle.HIGHEST_PROTOCOL)
-    print(test_case.summary)
+        pickle.dump(sparse_gp_model, handler, protocol=pickle.HIGHEST_PROTOCOL)
+    print(sparse_gp_model.summary)
