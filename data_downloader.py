@@ -51,7 +51,7 @@ class DailyFloodDataDownloader:
                 flood_df_single_loc.columns = ['DATE', 'GAGE_MAX', 'GAGE_MIN', 'GAGE_MEAN']
 
             except ValueError:
-                print(f'got less than four columns remaining. The info of station {station_id} is discarded.')
+                print(f'Some columns are missing. The data of station {station_id} is discarded.')
                 return None
 
             else:
@@ -59,7 +59,7 @@ class DailyFloodDataDownloader:
                 flood_df_single_loc['LONGITUDE'] = float(self.summary_file[self.summary_file.SiteNumber == station_id]['SiteLongitude'])
                 flood_df_single_loc['SITENUMBER'] = str(station_id)
 
-                print(f'finished processing site number {station_id}')
+                print(f'finished parsing site {station_id}')
                 return flood_df_single_loc
         else:
             print('Got an empty data frame.')
