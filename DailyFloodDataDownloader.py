@@ -67,20 +67,16 @@ class DailyFloodDataDownloader:
             print('Got an empty data frame.')
             return None
 
-    def parsing_engine(self, multiprocessing = True):
+    def parsing_engine(self):
 
-        '''
-        Args:
-            multiprocessing (bool): The parsing engine uses multiprocessing in default. Highly recommended if
-            you don't want to spend all day on this.
-        '''
-
-        if multiprocessing:
+        try:
             import concurrent.futures
             executor = concurrent.futures.ProcessPoolExecutor(max_workers = 8)
             result_generator = executor.map(self._single_station_parser, self.station_list)
             all_stations_df = pd.concat([df for df in result_generator])
-        else:
+        except:
+            print('the multiprocessing module failed. Fall back to single process')
+            print('this might take a while')
             all_stations_df = []
             for station_id in self.station_list:
                 single_station_info = self._single_station_parser(station_id)
@@ -96,7 +92,6 @@ class DailyFloodDataDownloader:
 
 if __name__ == '__main__':
 
-    scraper = DailyFloodDataDownloader()
-    test = scraper.parsing_engine(multiprocessing = True)
-    test.to_csv('/Users/haigangliu/Dropbox/DissertationCode/synthetic_data/flood_data_daily.csv')
+    scraper = DailyFloodDataDownloader().parsing_engine()
+    #test.to_csv('./data/flood_data_daily.csv')
     print(test.head())
