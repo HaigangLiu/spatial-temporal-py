@@ -15,7 +15,7 @@ class GPModelSpatialSparse:
         df (pandas dataframe): a data frame LATITUDE and LONGITUDE and reponse variable
         response_var (str): The name of column of Y
         split_ratio(float): The ratio to split training set and test set.
-            NOTE: set it to 1 if user only wants to train on the whole set.
+            NOTE: set it to 1 if user intends to train on the whole set.
     '''
     def __init__(self, df, response_var = 'PRCP', spilt_ratio = 0.7):
 
@@ -40,6 +40,8 @@ class GPModelSpatialSparse:
         Args:
             size (int): the length of markov chain
             create_traceplot (boolean): Whether or not generate the traceplot.
+            nodes (int): Number of kernels for approximation.
+            traceplot_name(str): the name of the traceplot file.
         '''
         self.model = pm.Model()
         with self.model:
@@ -68,10 +70,11 @@ class GPModelSpatialSparse:
         '''
         Args:
             new_df (pandas dataframe): the dataframe of new locations. Users can also include the truth value of Y.
-            Note that MSE cannot be computed if truth is not provided.
+            Note: user can skip this argument if already
+            passed the whole dataset in __init__()
+
         '''
         if new_df:
-            #allow user to pass new data later
             try:
                 self.X_test = coordinates_converter(new_df)
                 self.y_test = new_df[self.response_var]
@@ -106,3 +109,5 @@ if __name__ == '__main__':
     with open('result_sparse.pickle', 'wb') as handler:
         pickle.dump(sparse_gp_model, handler, protocol=pickle.HIGHEST_PROTOCOL)
     print(sparse_gp_model.summary)
+    #{'l1_loss': 2.0666038464203167, 'l2_loss': 7.570348577739918}
+
