@@ -38,7 +38,7 @@ class SpatialModelIDW:
         if self.K == 'auto':
             self.K = self._auto_choose_k(20)
 
-    def build_idw_model(self):
+    def fit(self):
         self.idw_model = KDtree(self.X_train)
 
     def _single_location_look_up(self, new_loc, new_real_value, p):
@@ -76,7 +76,7 @@ class SpatialModelIDW:
         min_loss = 10000
         argmin = -1
 
-        self.build_idw_model()
+        self.fit()
 
         for i in range(test_range):
             self.K = i + 2
@@ -95,11 +95,11 @@ if __name__ == '__main__':
     from SampleDataLoader import load_rainfall_data
     data = load_rainfall_data('monthly')
 
-    test_case = SpatialModelIDW(data, 'PRCP', K = 'auto')
-    test_case.build_idw_model()
-    vars_ = test_case.predict()
+    idw_model = SpatialModelIDW(data, 'PRCP', K = 'auto')
+    idw_model.fit()
+    vars_ = idw_model.predict()
 
     import pickle
     with open('idw.pickle', 'wb') as handler:
-        pickle.dump(test_case, handler, protocol=pickle.HIGHEST_PROTOCOL)
-    print(test_case.summary)
+        pickle.dump(idw_model, handler, protocol=pickle.HIGHEST_PROTOCOL)
+    print(idw_model.summary)
