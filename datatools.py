@@ -153,7 +153,7 @@ if __name__ == '__main__':
                       'DATE': str,
                       'GAGE_MAX': float,
                       'SITENUMBER': str},
-        aggregation_operations = {'GAGE_MAX': [np.max, 'GAGE_MAX']},
+        aggregation_operations = {'GAGE': [np.max, 'GAGE_MAX']},
         station_column = 'SITENUMBER',
         date_column = 'DATE')
 
