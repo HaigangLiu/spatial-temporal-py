@@ -4,7 +4,6 @@ import pymc3 as pm
 import numpy as np
 import pandas as pd
 import matplotlib.pyplot as plt
-from theano import shared
 import os
 from utilities_functions import coordinates_converter
 
@@ -15,95 +14,102 @@ class GPModelSpatial:
         data_frame (pandas dataframe): a data frame LATITUDE and LONGITUDE and reponse variable
         response_var (str): The name of column of Y
     '''
-    def __init__(self, data_frame, response_var, convert_coordinates = True):
+    def __init__(self, df, response_var  = 'PRCP', split_ratio= 0.7):
 
-        self.train_loc_cache = data_frame[['LATITUDE','LONGITUDE']]
-        self.convert_coordinates = convert_coordinates
-
-        if convert_coordinates:
-            coordinates = coordinates_converter(data_frame)
-        else:
-            coordinates = self.train_loc_cache
-            print('Lat and lon used directly to calculate Euclidean distance')
-
+        X = coordinates_converter(df).values
         self.response_var = response_var
-        self.X = shared(coordinates.values)
-        self.y = np.log(data_frame[self.response_var].values)
+        y = df[self.response_var].values
 
-    def build_gp_model(self, sampling_size = 5000, trace_plot_name = None):
+        all_index = list(range(len(df)))
+        train_size  = int(round(len(df)*split_ratio,0))
+
+        train_index = np.random.choice(all_index, train_size)
+        test_index = [idx for idx in all_index if idx not in train_index]
+
+        self.X_train = X[train_index]; self.X_test = X[test_index]
+        self.y_train = y[train_index]; self.y_test = y[test_index]
+
+        self.train_loc_cache = df.loc[train_index, ['LATITUDE','LONGITUDE']]
+        self.test_loc_cache = df.loc[test_index, ['LATITUDE','LONGITUDE']]
+
+    def fit(self, sampling_size = 5000, traceplot_name = None, fast_sampling = False):
         '''
         Args:
             sampling_size (int): the length of markov chain
             create_traceplot (boolean): Whether or not generate the traceplot.
         '''
-        with pm.Model() as model:
-            rho = pm.Exponential('rho', 1/5, shape = 2)
-            cov_func = pm.gp.cov.Matern52(2, ls = rho)
-            mean_prior = pm.Exponential('mean_prior', 1/3)
-            c = pm.Normal('constant_mean', mu = mean_prior, sd = 4,  shape = 98)
+        self.model = pm.Model()
+        with self.model:
+            rho = pm.Exponential('rho', 1/5, shape = 3)
+            tau = pm.Exponential('tau', 1/3)
 
-            gp = pm.gp.Marginal(mean_func = pm.gp.mean.Constant(c), cov_func = cov_func)
-            sigma = pm.HalfNormal("sigma", sd = 3)
-            y_ = gp.marginal_likelihood("y",
-                                        X = self.X,
-                                        y = self.y,
+            cov_func = pm.gp.cov.Matern52(3, ls = rho)
+            self.gp = pm.gp.Marginal(cov_func = cov_func)
+
+            sigma = pm.HalfNormal('sigma', sd = 3)
+            y_ = self.gp.marginal_likelihood('y',
+                                        X = self.X_train,
+                                        y = np.log(self.y_train),
                                         noise = sigma)
-            start = pm.find_MAP()
-            self.trace = pm.sample(sampling_size, nchains = 1)
 
-        self.model = model
+        if fast_sampling:
+            with self.model:
+                inference = pm.ADVI()
+                approx = pm.fit(n = 50000, method=inference) #until converge
+                self.trace = approx.sample(draws = sampling_size)
 
-        if trace_plot_name:
+        else:
+            with self.model:
+                start = pm.find_MAP()
+                self.trace = pm.sample(sampling_size, nchains = 1)
+
+        if traceplot_name:
             fig, axs = plt.subplots(3, 2) # 2 RVs
-            pm.traceplot(self.trace, varnames = ['rho', 'sigma', 'constant_mean'], ax = axs)
-            fig.savefig(trace_plot_name)
-            fig_path = os.path.join(os.getcwd(), trace_plot_name)
+            pm.traceplot(self.trace, varnames = ['rho', 'sigma', 'tau'], ax = axs)
+            fig.savefig(traceplot_name)
+            fig_path = os.path.join(os.getcwd(), traceplot_name)
             print(f'the traceplot has been saved to {fig_path}')
 
-    def predict(self, new_data_frame):
+    def predict(self, new_df = None, sample_size = 1000):
         '''
         Args:
             new_data_frame (pandas dataframe): the dataframe of new locations. Users can also include the truth value of Y.
             Note that MSE cannot be computed if truth is not provided.
         '''
-        self.test_loc_cache = new_data_frame[['LATITUDE', 'LONGITUDE']]
+        if new_df:
+            try:
+                self.X_test = coordinates_converter(new_df)
+                self.y_test = new_df[self.response_var]
+                self.test_loc_cache = new_df[['LATITUDE','LONGITUDE']]
+            except:
+                raise ValueError('The new dataframe should contain LATITUDE, LONGITUDE and the variable column, e.g., PRCP')
 
-        if self.convert_coordinates:
-            X_new = coordinates_converter(new_data_frame).values
-        else:
-            X_new = self.test_loc_cache
-            print('Lat and lon used directly to calculate Euclidean distance')
-
-        self.X.set_value(X_new)
         with self.model:
-            self.predicted_values = pm.sample_ppc(self.trace)
+            y_pred = self.gp.conditional("y_pred", self.X_test)
+            self.simulated_values = pm.sample_ppc(self.trace, vars=[y_pred], samples= sample_size)
+            self.predictions = np.exp(np.median(self.simulated_values['y_pred'], axis = 0))
 
-        median = np.median(self.predicted_values['y'], axis = 0)
-        try:
-            self.Y_new = new_data_frame[self.response_var].values
-        except:
-            print('truth column not provided, thus metrics like MSE are not calculated.')
-        else:
-            predicted_vals_transformed_back = np.exp(median)
-            l1_loss = np.mean(np.abs(predicted_vals_transformed_back - self.Y_new))
-            l2_loss = np.mean(np.square(predicted_vals_transformed_back - self.Y_new))
-            self.summary = {'l1_loss': l1_loss, 'l2_loss': l2_loss}
-        return median
+        l1_loss = np.mean(np.abs(self.predictions - self.y_test))
+        l2_loss = np.mean(np.square(self.predictions - self.y_test))
+        self.summary = {'l1_loss': l1_loss, 'l2_loss': l2_loss}
+
+        output_df = self.test_loc_cache.copy()
+        output_df['PRED'] = self.predictions
+
+        return self.predictions
 
 if __name__ == '__main__':
-
     from SampleDataLoader import load_rainfall_data
     data = load_rainfall_data('monthly')
-    data_list = list(range(len(data)))
-    test_list =  np.random.choice(data_list, 0,  replace = False)
-    train_list = [i for i in data_list if i not in test_list]
 
-    test_case = GPModelSpatial(data.iloc[train_list], 'PRCP', convert_coordinates = True)
-    test_case.build_gp_model(trace_plot_name = 'test_traceplot.png')
-    vars_ = test_case.predict(data.iloc[train_list])
-    #vars_ = test_case.predict(data.iloc[test_list])
+    gp_spatial_model = GPModelSpatial(data, split_ratio = 0.7, response_var = 'PRCP')
+    gp_spatial_model.fit(traceplot_name = 'test_traceplot.png', fast_sampling = True)
+    vars_ = gp_spatial_model.predict()
 
     import pickle
     with open('result.pickle', 'wb') as handler:
-        pickle.dump(test_case, handler, protocol=pickle.HIGHEST_PROTOCOL)
-    print(test_case.summary)
+        pickle.dump(gp_spatial_model, handler, protocol=pickle.HIGHEST_PROTOCOL)
+
+    print(gp_spatial_model.summary)
+    print(gp_spatial_model.y_test)
+    print(gp_spatial_model.predictions)
