@@ -11,11 +11,11 @@ class SpatialModelIDW:
         and the column of variable of interest.
 
     response_var (str): Variable name
-    spilt_ratio (float): Split ratio between train and test set
+    split_ratio (float): Split ratio between train and test set
     K (int): number of neighbors to borrow information from
     '''
 
-    def __init__(self, df, response_var = 'PRCP', spilt_ratio = 0.7, K = 5):
+    def __init__(self, df, response_var = 'PRCP', split_ratio = 0.7, K = 5):
 
         self.response_var = response_var
 
@@ -23,7 +23,7 @@ class SpatialModelIDW:
         y = df[self.response_var].values
 
         all_index = list(range(len(df)))
-        train_size  = int(round(len(df)*spilt_ratio,0))
+        train_size  = int(round(len(df)*split_ratio,0))
 
         train_index = np.random.choice(all_index, train_size)
         test_index = [idx for idx in all_index if idx not in train_index]
@@ -103,3 +103,4 @@ if __name__ == '__main__':
     with open('idw.pickle', 'wb') as handler:
         pickle.dump(idw_model, handler, protocol=pickle.HIGHEST_PROTOCOL)
     print(idw_model.summary)
+    #{'l1_loss': 1.4411817577976724, 'l2_loss': 4.652838883772935}
