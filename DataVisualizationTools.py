@@ -37,7 +37,22 @@ class PlotDataOnMap:
         self.locs = list(self.locations.values)
         self.map = folium.Map(location= self.center, zoom_start = 7)
 
-    def plot_locations(self, unclustered = True, contoured = True, open_in_browser = True):
+    def _save_map(self, figname, open_in_browser):
+        if figname:
+            assert figname.endswith('html'), 'need .html as file extension'
+            self.map.save(figname)
+
+        else:
+            figname = 'test_map.html'
+            self.map.save(figname)
+
+        output_path = os.path.join(os.getcwd(), figname)
+        print(f'the map has been save to {output_path}')
+        if open_in_browser:
+            webbrowser.open('file://' + os.path.realpath(output_path))
+
+
+    def plot_locations(self, unclustered = True, contoured = True, open_in_browser = True, figname = None):
 
         if unclustered:
             for coord in self.locs:
@@ -56,14 +71,12 @@ class PlotDataOnMap:
                     }
                 ).add_to(self.map)
 
-        self.map.save('test_map.html')
-        output_path = os.path.join(os.getcwd(), 'test_map.html')
-        print(f'the map has been save to {output_path}')
-        if open_in_browser:
-            webbrowser.open('file://' + os.path.realpath(output_path))
+        self._save_map(figname, open_in_browser)
+
+
         return self.map
 
-    def plot_variable_values(self, contoured = True, open_in_browser = True, size_multiplier = 1):
+    def plot_variable_values(self, contoured = True, open_in_browser = True, size_multiplier = 1, figname = None):
 
         for value, location in zip(self.variable, self.locations.values):
 
@@ -91,15 +104,8 @@ class PlotDataOnMap:
                     }
                 ).add_to(self.map)
 
-        self.map.save('test_map_with_value.html')
-        output_path = os.path.join(os.getcwd(), 'test_map_with_value.html')
-
-        print(f'the map has been save to {output_path}')
-        if open_in_browser:
-            webbrowser.open('file://' + os.path.realpath(output_path))
+        self._save_map(figname, open_in_browser)
         return self.map
-
-
 
 def diagnosis_plot_error_bars_spatial(spatial_model, upper_percentile = 95, lower_percentile = 5, figname = None):
 
@@ -143,10 +149,12 @@ if __name__ == '__main__':
     predictions = result_from_pickle.predictions
     real_values = result_from_pickle.Y_new
 
-    plotter2 = PlotDataOnMap(variable = predictions - real_values, locations = loc)
-    figure = plotter2.plot_variable_values(size_multiplier = 2)
+    locs_ = PlotDataOnMap(variable = predictions - real_values, locations = loc).plot_locations(figname = 'just_location.html')
+
+    values_ = PlotDataOnMap(variable = predictions - real_values, locations = loc).plot_variable_values(size_multiplier = 3.5, figname = 'with_value.html')
 
     fig2 = diagnosis_plot_error_bars_spatial(result_from_pickle, figname = 'test.png')
 
+    plt.show()
     print(predictions)
     print(real_values)
