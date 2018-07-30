@@ -63,7 +63,7 @@ class SpatialKernelModel:
 
         with  self.model:
             evaluated_kernels = []
-            packed_L = pm.LKJCholeskyCov('packed_L', n=3, eta=2., sd_dist = pm.HalfCauchy.dist(2.5))
+            packed_L = pm.LKJCholeskyCov('packed_L', n=3, eta = 2., sd_dist = pm.HalfCauchy.dist(2.5))
             L = pm.expand_packed_triangular(3, packed_L)
 
             for center in self.centers.values:
@@ -78,7 +78,7 @@ class SpatialKernelModel:
             if fast_sampling:
                 with self.model:
                     inference = pm.ADVI()
-                    approx = pm.fit(n = 50000, method=inference) #until converge
+                    approx = pm.fit(n = sample_size, method=inference) #until converge
                     self.trace = approx.sample(draws = sample_size)
 
             else:
@@ -119,10 +119,11 @@ class SpatialKernelModel:
         return self.predictions
 
 if __name__ == '__main__':
+
     from SampleDataLoader import load_rainfall_data
     data = load_rainfall_data('monthly')
-    kernel_model = SpatialKernelModel(data, split_ratio = 0.7, response_var = 'PRCP', number_of_centers = 6)
-    kernel_model.fit(20000, traceplot_name = 'kernel_method.png', fast_sampling = True)
+    kernel_model = SpatialKernelModel(data, split_ratio = 0.7, response_var = 'PRCP', number_of_centers = 4)
+    kernel_model.fit(200000, traceplot_name = 'kernel_method.png', fast_sampling = True)
     kernel_model.predict(sample_size = 10000)
 
     print(kernel_model.summary)
