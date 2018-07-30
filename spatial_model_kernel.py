@@ -9,7 +9,6 @@ from theano import shared
 from utilities_functions import coordinates_converter
 
 class SpatialKernelModel:
-
     '''
     This model is inspired by Stroud et al (2001).
     The idea is
@@ -123,9 +122,12 @@ if __name__ == '__main__':
     from SampleDataLoader import load_rainfall_data
     data = load_rainfall_data('monthly')
     kernel_model = SpatialKernelModel(data, split_ratio = 0.7, response_var = 'PRCP', number_of_centers = 6)
-    kernel_model.fit(20000, traceplot_name = 'kernel_method.png', fast_sampling = False)
+    kernel_model.fit(20000, traceplot_name = 'kernel_method.png', fast_sampling = True)
     kernel_model.predict(sample_size = 10000)
 
     print(kernel_model.summary)
     print(kernel_model.y_test)
     print(kernel_model.predictions)
+    # normal way of sampling will take more than 8 hrs
+    # the result is given as follows:
+    #{'l1_loss': 2.1072895862275756, 'l2_loss': 6.4519992329848375}
