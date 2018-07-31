@@ -3,7 +3,7 @@ import pandas as pd
 def load_rainfall_data(option = 'monthly'):
 
     if option == 'monthly':
-        retained_var_list = ['STATION','YEAR', 'MONTH','LATITUDE','LONGITUDE', 'PRCP', 'SST']
+        retained_var_list = ['STATION','YEAR', 'MONTH','LATITUDE','LONGITUDE','ELEVATION', 'PRCP', 'SST']
         monthly_data = pd.read_csv('./data/with_sst_1_year.csv')[retained_var_list]
         sample_data = monthly_data[(monthly_data.YEAR == 2015) & (monthly_data.MONTH == 10)]
         print('This is the rainfall data on October 2015.')
@@ -90,6 +90,36 @@ def load_rainfall_data_spatial_temporal(option = 'five-year'):
     print(f'This is the rainfall data of {option} : {more_info}. There are {len(sample_data)} records.')
     return sample_data
 
+
+def load_rainfall_data_flat_and_wide(option = 'five-year', keywords = ['PRCP', 'SST']):
+
+    if option == 'one-year':
+        df = pd.read_csv('./data/with_sst_1_year_flat_and_wide.csv')
+        more_info = 'year 2015'
+
+    elif option == 'five-year':
+        df = pd.read_csv('./data/with_sst_5_years_flat_and_wide.csv')
+        more_info = '2011 - 2015'
+    else:
+        raise ValueError(f'only accepts one-month or five-month. {option} is not available.')
+        return None
+
+    try:
+        df.drop('Unnamed: 0', axis= 1, inplace= True)
+    except:
+        pass
+
+    retained_var_list = ['STATION', 'LATITUDE', 'LONGITUDE']
+
+    for keyword in keywords:
+        for column in df.columns:
+            if column.startswith(keyword):
+                retained_var_list.append(column)
+    sample_data = df[retained_var_list]
+
+    print(f'This is the rainfall data of {option} : {more_info}. There are {len(sample_data)} records.')
+    return sample_data
+
 if __name__ == '__main__':
 
     s1 = load_flood_data('monthly')
@@ -101,3 +131,6 @@ if __name__ == '__main__':
     s6 = load_flood_data_spatial_temporal('one-year')
     s7 = load_rainfall_data_spatial_temporal('five-year')
     s8 = load_flood_data_spatial_temporal('five-year')
+
+    s9 = load_rainfall_data_flat_and_wide('five-year')
+    s10 = load_rainfall_data_flat_and_wide('one-year')
