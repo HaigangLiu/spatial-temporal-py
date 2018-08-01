@@ -124,10 +124,20 @@ if __name__ == '__main__':
     target_dir_flood = './data/flood_data_5_years.csv'
     monthly_flood = pd.read_csv(target_dir_flood)
 
-    five_year =  RangeSelector(monthly_flood, '2011-01', '2015-12', unique_column_name = 'SITENUMBER', response_var = 'GAGE_MAX').flip_to_flat_and_wide(vars_to_retain = ['GAGE_MAX'])
+    five_year =  RangeSelector(monthly_flood,
+                               in_date = '2011-01',
+                               out_date = '2015-12',
+                               unique_column_name = 'SITENUMBER',
+                               response_var = 'GAGE_MAX')\
+                .flip_to_flat_and_wide(vars_to_retain = ['GAGE_MAX'])
     five_year.to_csv('./data/flood_5_years_flat_and_wide.csv')
 
-    one_year =  RangeSelector(monthly_flood, '2015-01', '2015-12', unique_column_name = 'SITENUMBER', response_var = 'GAGE_MAX').flip_to_flat_and_wide(vars_to_retain = ['GAGE_MAX'])
+    one_year =  RangeSelector(monthly_flood,
+                               in_date = '2015-01',
+                               out_date = '2015-12',
+                               unique_column_name = 'SITENUMBER',
+                               response_var = 'GAGE_MAX')\
+                .flip_to_flat_and_wide(vars_to_retain = ['GAGE_MAX'])
     one_year.to_csv('./data/flood_1_year_flat_and_wide.csv')
 
 
