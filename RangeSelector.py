@@ -103,21 +103,33 @@ class RangeSelector:
 
 if __name__ == '__main__':
 
-    # target_dir = './data/monthly_rainfall.csv'
+    # ---- working with rainfall data ------
+
     nc_mask_dir = '/Users/haigangliu/Dropbox/DataRepository/data_file_new/lsmask.nc'
     nc_data_dir = '/Users/haigangliu/Dropbox/DissertationCode/sst/sst.mnmean.nc'
 
-    # save_dir = './data/with_sst_1_year.csv'
-    # save_dir2 = '/Users/haigangliu/Dropbox/DissertationCode/synthetic_data/with_sst_1_year_flat_and_wide.csv'
+    target_dir_rain = './data/monthly_rainfall.csv'
+    monthly_rain = pd.read_csv(target_dir_rain)
 
-    # monthly_rain = pd.read_csv(target_dir)
+    selector =  RangeSelector(monthly_rain,
+                               in_date = '2015-01',
+                               out_date = '2015-12',
+                               unique_column_name = 'STATION',
+                               response_var = 'PRCP')\
 
-    # selector = RangeSelector(monthly_rain, '2015-01', '2015-12')
-    # merged_table = selector.merge_with_sst(nc_data_dir, nc_mask_dir)
-    # merged_table_flat_and_wide = selector.flip_to_flat_and_wide()
-    # print(merged_table_flat_and_wide.head())
-    # merged_table.to_csv(save_dir)
-    # merged_table_flat_and_wide.to_csv(save_dir2)
+    one_year_rain = selector.merge_with_sst(nc_data_dir, nc_mask_dir)
+    one_year_rain_fw = selector.flip_to_flat_and_wide(vars_to_retain = ['SST','PRCP','TMAX','TMIN'])
+
+
+    selector_2 =  RangeSelector(monthly_rain,
+                               in_date = '2011-01',
+                               out_date = '2015-12',
+                               unique_column_name = 'STATION',
+                               response_var = 'PRCP')\
+
+    five_year_rain = selector_2.merge_with_sst(nc_data_dir, nc_mask_dir)
+    five_year_rain_fw = selector_2.flip_to_flat_and_wide(vars_to_retain = ['SST','PRCP','TMAX','TMIN'])
+
 
     # ---- working with flood data ------
 
