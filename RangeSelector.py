@@ -50,7 +50,7 @@ class RangeSelector:
         stations_w_complete_records = list(stations_w_complete_records_.index[stations_w_complete_records_.values])
         self.complete_records_wo_sst = df_w_quanlified_dates[df_w_quanlified_dates[self.unique_column_name].isin(stations_w_complete_records)]
 
-    def merge_with_sst(self, nc_data_dir, nc_mask_dir):
+    def add_sst_info(self, nc_data_dir, nc_mask_dir):
 
         cal = SSTcalculator(nc_data_dir = nc_data_dir, nc_mask_dir = nc_mask_dir)
         lats_and_lons = self.complete_records_wo_sst.groupby(self.unique_column_name).first().reset_index()[[self.unique_column_name, 'LONGITUDE', 'LATITUDE']]
@@ -117,7 +117,7 @@ if __name__ == '__main__':
                                unique_column_name = 'STATION',
                                response_var = 'PRCP')\
 
-    one_year_rain = selector.merge_with_sst(nc_data_dir, nc_mask_dir)
+    one_year_rain = selector.add_sst_info(nc_data_dir, nc_mask_dir)
     one_year_rain_fw = selector.flip_to_flat_and_wide(vars_to_retain = ['SST','PRCP','TMAX','TMIN'])
 
 
@@ -127,7 +127,7 @@ if __name__ == '__main__':
                                unique_column_name = 'STATION',
                                response_var = 'PRCP')\
 
-    five_year_rain = selector_2.merge_with_sst(nc_data_dir, nc_mask_dir)
+    five_year_rain = selector_2.add_sst_info(nc_data_dir, nc_mask_dir)
     five_year_rain_fw = selector_2.flip_to_flat_and_wide(vars_to_retain = ['SST','PRCP','TMAX','TMIN'])
 
 
