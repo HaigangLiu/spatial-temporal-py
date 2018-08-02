@@ -28,11 +28,9 @@ class dailyToMonthlyConverter:
         station_column (str): name of the columnn of station name.
         date_column (str): name of the columnn of station name.
     '''
-    def __init__(self, file_dir,  dtype_dict = None, aggregation_operations = None, station_column = None, date_column = None):
+    def __init__(self, file_dir, dtype_dict = None, aggregation_operations = None, station_column = None, date_column = None):
 
         self.file_dir = file_dir
-        self.file_list = [file_name for file_name in os.listdir(self.file_dir) if file_name.endswith('.csv')]
-
         if dtype_dict is None:
             self.dtype_dict = {'STATION': str,
                                 'ELEVATION': float,
@@ -103,24 +101,26 @@ class dailyToMonthlyConverter:
         output_df["MONTH"] = output_df['DATE'].dt.month
         return output_df
 
-    def multiple_file_handler(self, file_list_ = None, multiprocessing = True):
+    def multiple_file_handler(self, file_list = None, multiprocessing = True):
         '''
         Args:
             multiprocessing (boolean): Use multiple processing or not. The default is on.
-            file_list_: a list of files names. If not specified, all csv file in this directory will be parsed
+            file_list: a list of files names. If not specified, all csv file in this directory will be parsed
 
         '''
-        if file_list_ is None:
-            file_list_ = self.file_list
+        if file_list is None:
+            print('finding all the csv files in given directory')
+            file_list = [file_name for file_name in os.listdir(self.file_dir) if file_name.endswith('.csv')]
 
-        if multiprocessing:
+        try:
             import concurrent.futures
             executor = concurrent.futures.ProcessPoolExecutor(max_workers = 8)
-            result_generator = executor.map(self.single_file_handler, file_list_)
+            result_generator = executor.map(self.single_file_handler, file_list)
             output = pd.concat(list(result_generator))
 
-        else:
-            for file_name in file_list_:
+        except:
+            print('multiprocessing not working and fall back to single process')
+            for file_name in file_list:
                 one_file = self.single_file_handler(file_name)
                 print(f'finished processing file {file_name} and generated {one_file.shape[0]} records')
                 file_content_list.append(one_file)
@@ -133,7 +133,7 @@ if __name__ == '__main__':
     dir_to_raw_daily_files = '/Users/haigangliu/Dropbox/DissertationCode/precipitation/'
     handler = dailyToMonthlyConverter(dir_to_raw_daily_files)
     single = handler.single_file_handler('829078.csv') #single file
-    monthly_rain_output = handler.multiple_file_handler(multiprocessing = True)
+    monthly_rain_output = handler.multiple_file_handler()
 
     monthly_rain_output['RANGE_HIGH'] = monthly_rain_output['TMAX'] - monthly_rain_output['TMAX_MIN']
     monthly_rain_output['RANGE_LOW'] = monthly_rain_output['TMIN_MAX'] - monthly_rain_output['TMIN']
@@ -143,8 +143,8 @@ if __name__ == '__main__':
 
     # note that user can pass in np.ptp function to calculate
     #range, but doing that is mysteriously slow (24 sec for range
-       # vs 1 sec for max or min). That's why this operation is
-       #  done manually like this.
+    # vs 1 sec for max or min). That's why this operation is
+    # done manually like this.
 
     # ----- generate data for flood ------
     converter = dailyToMonthlyConverter('./data/',
