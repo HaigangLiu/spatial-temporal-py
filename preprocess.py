@@ -149,12 +149,26 @@ if __name__ == '__main__':
     target_dir_flood = './data/flood_data_5_years.csv'
     monthly_flood = pd.read_csv(target_dir_flood)
 
-    one_year_flood = PreprocessingPipeline(monthly_flood, unique_column_name = 'SITENUMBER', response_var = 'GAGE_MAX').select_given_range(in_date = '2015-01',out_date = '2015-12').add_sst_info().get_values()
+    one_year_flood = PreprocessingPipeline(monthly_flood, unique_column_name = 'SITENUMBER', response_var = 'GAGE_MAX').\
+    select_given_range(in_date = '2015-01',out_date = '2015-12').\
+    add_sst_info().\
+    get_values()
 
-    five_year_flood  = PreprocessingPipeline(monthly_flood, unique_column_name = 'SITENUMBER', response_var = 'GAGE_MAX').select_given_range(in_date = '2011-01', out_date = '2015-12').add_sst_info().get_values()
+    five_year_flood  = PreprocessingPipeline(monthly_flood, unique_column_name = 'SITENUMBER', response_var = 'GAGE_MAX').\
+    select_given_range(in_date = '2011-01', out_date = '2015-12').\
+    add_sst_info().\
+    get_values()
 
-    one_year_rain_fw = PreprocessingPipeline(monthly_flood, unique_column_name = 'SITENUMBER', response_var = 'GAGE_MAX').select_given_range(in_date = '2015-01', out_date = '2015-12').add_sst_info().flip_to_flat_and_wide(vars_to_retain = ['GAGE_MAX']).get_values()
+    one_year_rain_fw = PreprocessingPipeline(monthly_flood, unique_column_name = 'SITENUMBER', response_var = 'GAGE_MAX').\
+    select_given_range(in_date = '2015-01', out_date = '2015-12').\
+    add_sst_info().\
+    flip_to_flat_and_wide(vars_to_retain = ['GAGE_MAX']).\
+    get_values()
 
-    five_year_rain_fw = PreprocessingPipeline(monthly_flood, unique_column_name = 'SITENUMBER', response_var = 'GAGE_MAX').select_given_range(in_date = '2011-01', out_date = '2015-12').add_sst_info().flip_to_flat_and_wide(vars_to_retain = ['GAGE_MAX']).get_values()
+    five_year_rain_fw = PreprocessingPipeline(monthly_flood, unique_column_name = 'SITENUMBER', response_var = 'GAGE_MAX').\
+    select_given_range(in_date = '2011-01', out_date = '2015-12').\
+    add_sst_info().\
+    flip_to_flat_and_wide(vars_to_retain = ['GAGE_MAX']).\
+    get_values()
 
 
