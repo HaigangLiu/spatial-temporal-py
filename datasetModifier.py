@@ -79,13 +79,14 @@ def add_seasonal_indicator(dataframe, new_col = 'SEASON', rule = None):
 
 if __name__ == '__main__':
 
-    df = pd.read_csv('/Users/haigangliu/Dropbox/DissertationCode/synthetic_data/with_sst_5_years_flat_and_wide.csv')
+    df = pd.read_csv('./data/with_sst_5_years_flat_and_wide.csv')
     trend_remover = SimpleTrendRemover(data_frame= df, response_var='PRCP', flat_and_wide= True)
-    f = trend_remover.update_dataframe_with_resid()
-    f.to_csv('/Users/haigangliu/Dropbox/DissertationCode/synthetic_data/with_sst_5_years_flat_and_wide_residual.csv')
+    flat_and_wide_case = trend_remover.update_dataframe_with_resid()
+    flat_and_wide_case.to_csv('./data/with_sst_5_years_flat_and_wide_residual.csv')
 
-    # df2 = pd.read_csv('/Users/haigangliu/Dropbox/DissertationCode/synthetic_data/with_sst_5_years.csv')
+    df2 = pd.read_csv('./data/with_sst_5_years.csv')
     trend_remover2 = SimpleTrendRemover(data_frame= df2, response_var='PRCP', flat_and_wide= False)
-    f2 = trend_remover2.update_dataframe_with_resid()
-    # f2.to_csv('/Users/haigangliu/Dropbox/DissertationCode/synthetic_data/with_sst_5_years_residual.csv')
+    non_flat_and_wide_case = trend_remover2.update_dataframe_with_resid()
+    non_flat_and_wide_case.to_csv('./data/with_sst_5_years_reisdual.csv')
+
 
