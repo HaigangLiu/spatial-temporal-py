@@ -122,13 +122,27 @@ if __name__ == '__main__':
     target_dir_rain = './data/monthly_rainfall.csv'
     monthly_rain = pd.read_csv(target_dir_rain)
 
-    one_year_rain = PreprocessingPipeline(monthly_rain, unique_column_name = 'STATION', response_var = 'PRCP').select_given_range(in_date = '2015-01',out_date = '2015-12').add_sst_info().get_values()
+    one_year_rain = PreprocessingPipeline(monthly_rain, unique_column_name = 'STATION', response_var = 'PRCP').\
+    select_given_range(in_date = '2015-01',out_date = '2015-12').\
+    add_sst_info().\
+    get_values()
 
-    five_year_rain = PreprocessingPipeline(monthly_rain, unique_column_name = 'STATION', response_var = 'PRCP').select_given_range(in_date = '2011-01', out_date = '2015-12').add_sst_info().get_values()
+    five_year_rain = PreprocessingPipeline(monthly_rain, unique_column_name = 'STATION', response_var = 'PRCP').\
+    select_given_range(in_date = '2011-01', out_date = '2015-12').\
+    add_sst_info().\
+    get_values()
 
-    one_year_rain_fw = PreprocessingPipeline(monthly_rain, unique_column_name = 'STATION', response_var = 'PRCP').select_given_range(in_date = '2015-01', out_date = '2015-12').add_sst_info().flip_to_flat_and_wide(vars_to_retain = ['PRCP', 'TMAX','TMIN', 'SST']).get_values()
+    one_year_rain_fw = PreprocessingPipeline(monthly_rain, unique_column_name = 'STATION', response_var = 'PRCP').\
+    select_given_range(in_date = '2015-01', out_date = '2015-12').\
+    add_sst_info().\
+    flip_to_flat_and_wide(vars_to_retain = ['PRCP', 'TMAX','TMIN', 'SST']).\
+    get_values()
 
-    five_year_rain_fw = PreprocessingPipeline(monthly_rain, unique_column_name = 'STATION', response_var = 'PRCP').select_given_range(in_date = '2011-01', out_date = '2015-12').add_sst_info().flip_to_flat_and_wide(vars_to_retain = ['PRCP', 'TMAX','TMIN', 'SST']).get_values()
+    five_year_rain_fw = PreprocessingPipeline(monthly_rain, unique_column_name = 'STATION', response_var = 'PRCP').\
+    select_given_range(in_date = '2011-01', out_date = '2015-12').\
+    add_sst_info().\
+    flip_to_flat_and_wide(vars_to_retain = ['PRCP', 'TMAX','TMIN', 'SST']).\
+    get_values()
 
     # ---- working with flood data ------
 
