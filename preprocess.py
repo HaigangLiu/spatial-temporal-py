@@ -162,13 +162,13 @@ if __name__ == '__main__':
     one_year_rain_fw = PreprocessingPipeline(monthly_flood, unique_column_name = 'SITENUMBER', response_var = 'GAGE_MAX').\
                         select_given_range(in_date = '2015-01', out_date = '2015-12').\
                         add_sst_info().\
-                        flip_to_flat_and_wide(vars_to_retain = ['GAGE_MAX']).\
+                        flip_to_flat_and_wide(vars_to_retain = ['GAGE_MAX', 'SST']).\
                         get_values()
 
     five_year_rain_fw = PreprocessingPipeline(monthly_flood, unique_column_name = 'SITENUMBER', response_var = 'GAGE_MAX').\
                         select_given_range(in_date = '2011-01', out_date = '2015-12').\
                         add_sst_info().\
-                        flip_to_flat_and_wide(vars_to_retain = ['GAGE_MAX']).\
+                        flip_to_flat_and_wide(vars_to_retain = ['GAGE_MAX', 'SST']).\
                         get_values()
 
 
