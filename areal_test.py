@@ -9,9 +9,8 @@ def convert_to_geopanda(df, crs=None):
     covert a dataframe to a geo pandas dataframe
     Args:
     df (dataframe): a pandas dataframe, must include a column called LATITUDE and another column called LONGITUDE.
-    crs (dict, optionally): specify the mapping
+    crs (dict, optional): specify the mapping
     '''
-
     latitude = df['LATITUDE']
     longitude = df['LONGITUDE']
 
@@ -48,15 +47,17 @@ def fill_area_with_point_data(areal_data, point_data, column_name):
     areal_data_copy = areal_data_copy.assign(**{column_name: results})
     return areal_data_copy
 
-rainfall_daily = load_rainfall_data('daily')
-flood_daily = load_flood_data('daily')
+if __name__ == '__main__':
 
-rain_geo_pandas = convert_to_geopanda(rainfall_daily)
-flood_geo_pandas = convert_to_geopanda(flood_daily)
+    rainfall_daily = load_rainfall_data('daily')
+    flood_daily = load_flood_data('daily')
 
-huc8_units_file ='/Users/haigangliu/SpatialTemporalBayes/data/shape_file/hydrologic_HUC8_units/wbdhu8_a_sc.shp'
-huc8_units = gpd.read_file(huc8_units_file)
-areal_data = fill_area_with_point_data(huc8_units, rain_geo_pandas, 'PRCP')
-areal_data = fill_area_with_point_data(areal_data, flood_geo_pandas, 'GAGE_MAX')
+    rain_geo_pandas = convert_to_geopanda(rainfall_daily)
+    flood_geo_pandas = convert_to_geopanda(flood_daily)
 
-test_dataset = areal_data[['NAME', 'geometry', 'PRCP', 'GAGE_MAX']]
+    huc8_units_file ='/Users/haigangliu/SpatialTemporalBayes/data/shape_file/hydrologic_HUC8_units/wbdhu8_a_sc.shp'
+    huc8_units = gpd.read_file(huc8_units_file)
+    areal_data = fill_area_with_point_data(huc8_units, rain_geo_pandas, 'PRCP')
+    areal_data = fill_area_with_point_data(areal_data, flood_geo_pandas, 'GAGE_MAX')
+
+    test_dataset = areal_data[['NAME', 'geometry', 'PRCP', 'GAGE_MAX']]
