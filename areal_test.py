@@ -1,7 +1,7 @@
 import os
 import pysal as ps
 import geopandas as gpd
-from shapely.geometry import Point, Polygon
+from shapely.geometry import Point
 from SampleDataLoader import load_flood_data, load_rainfall_data
 
 def convert_to_geopanda(df, crs=None):
