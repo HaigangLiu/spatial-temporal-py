@@ -10,6 +10,8 @@ def convert_to_geopanda(df, crs=None):
     Args:
     df (dataframe): a pandas dataframe, must include a column called LATITUDE and another column called LONGITUDE.
     crs (dict, optional): specify the mapping
+    Return:
+    a geo-pandas dataframe, with an additional column 'geometry'.
     '''
     latitude = df['LATITUDE']
     longitude = df['LONGITUDE']
