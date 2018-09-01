@@ -19,7 +19,6 @@ def water_shed_finder(data_frame, watershed_file=None, remove_singular=True):
         A new dataframe with an additional column called WATERSHED
     '''
     if watershed_file is None:
-        print('')
         watershed_file = 'data/shape_file/hydrologic_HUC8_units/wbdhu8_a_sc.shp'
         watershed_file = os.path.join(os.getcwd(), watershed_file)
 
@@ -47,9 +46,8 @@ def water_shed_finder(data_frame, watershed_file=None, remove_singular=True):
     return df
 
 def neighbor_finder(dataframe, column):
-
     watershed_list = dataframe[column]
-    neighbor_matrix = [] # an nxn matrix, 1 for adjcent, 0 for not.
+    neighbor_matrix = [] # an n by n matrix, 1 for adjcent, 0 for not.
     for entry in watershed_list:
         w = [0 if entry!=comp else 1 for comp in watershed_list]
         neighbor_matrix.append(w)
