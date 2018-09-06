@@ -63,8 +63,37 @@ def neighbor_finder(dataframe, column):
 
     return neighbor_matrix, adjcent_matrix, weight_matrix
 
+
+def matrix_padding(input_list, max_padding=None):
+
+    '''
+    construct the matrix of W by making sure that every
+    row has the same length.
+    args:
+        input list (list): a list of spatial information for each location
+        max padding (int): the length of padded row. Must be equal or longer than the longest row.
+    '''
+    max_vector_length = max([len(row) for row in input_list])
+    if max_padding is None:
+        max_padding = max_vector_length
+    elif max_padding > max_vector_length:
+        pass
+    else:
+        raise ValueError('max_padding must be equal or greater than the longest row')
+
+    input_list_copy = input_list.copy()
+    for row in input_list_copy:
+        while len(row) < max_padding:
+            row.append(0)
+
+    return np.array(input_list_copy)
+
+
 if __name__ == '__main__':
     daily_flood = load_flood_data(option = 'daily')#usage
     df_with_watershed_assigned = water_shed_finder(daily_flood)
+    print(df_with_watershed_assigned)
     NM, AM, WM = neighbor_finder(df_with_watershed_assigned, 'WATERSHED')
-    print(WM, AM, NM)
+
+    padded_weights = matrix_padding(AM)
+    padded_adj = matrix_padding(WM)
