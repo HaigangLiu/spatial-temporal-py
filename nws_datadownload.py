@@ -1,12 +1,10 @@
 import os
-import pandas as pd
-import numpy as np
 import requests
 from datetime import date, timedelta
-
+import concurrent.futures
 #example_link
 # ='https://water.weather.gov/precip/archive/2015/10/02/nws_precip_conus_20151002.nc'
-class NationWeatherServiceDataDownloader:
+class nwsDataDownloader:
     '''
     Downloading Precipitation dataset from national weather service (NWS)
     The available dates ranges from 01/01/2005 to 06/27/2017
@@ -65,7 +63,9 @@ class NationWeatherServiceDataDownloader:
         return link_in, dir_out
 
     @staticmethod
-    def file_download(input_link, name_out):
+    def file_download(in_and_out):
+
+        input_link, name_out = in_and_out
         content = requests.get(input_link)
         with open(name_out, 'wb') as f:
             for chunk in content.iter_content(chunk_size=1024):
@@ -74,20 +74,22 @@ class NationWeatherServiceDataDownloader:
 
         file_size = os.path.getsize(name_out)
         if file_size:
+            print(f'finished writing data to file {name_out}')
             return 0
         else:
             raise ValueError('the file is empty. Check the link')
             return 1
 
     def run(self):
-        job_list = FileDownloader.range_handler(self.start, self.end)
-        links_in = []; files_out = []
+        job_list = nwsDataDownloader.range_handler(self.start, self.end)
+        in_and_outs = []
 
         for date_ in job_list:
-            link_in, dir_out = FileDownloader._make_link(self.web_loc,
-                self.local_loc, date_)
-            FileDownloader.file_download(link_in, dir_out)
-            print(f'successfully downloaded the rainfall data for {date_}')
+            link_in, dir_out = nwsDataDownloader._make_link(self.web_loc,self.local_loc, date_)
+            in_and_outs.append([link_in, dir_out])
+
+        executor = concurrent.futures.ProcessPoolExecutor(max_workers = 8)
+        start_downloading = executor.map(nwsDataDownloader.file_download, in_and_outs)
 
 if __name__ == '__main__':
 
@@ -95,4 +97,5 @@ if __name__ == '__main__':
     from_date = '2015-06-01'
     to_date = '2016-06-01'
 
-    download_handler = FileDownloader(local_loc_, from_date, to_date).run()
+    download_handler = nwsDataDownloader(local_loc_, from_date, to_date).run()
+
