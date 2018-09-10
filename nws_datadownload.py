@@ -1,27 +1,16 @@
+import os
 import pandas as pd
 import numpy as np
 import requests
-
-
-# archive_loc = 'https://water.weather.gov/precip/archive'
-# file_name = '2015/10/01/nws_precip_1day_observed_shape_20151001.tar.gz'
-#example_link
-# ='https://water.weather.gov/precip/archive/2015/10/02/nws_precip_conus_20151002.nc'
-# import os
-# abs_path = os.path.join(archive_loc, file_name)
-# r = requests.get(abs_path, allow_redirects=True)
-
-import os
 from datetime import date, timedelta
 
-
+#example_link
+# ='https://water.weather.gov/precip/archive/2015/10/02/nws_precip_conus_20151002.nc'
 class NationWeatherServiceDataDownloader:
-
     '''
     Downloading Precipitation dataset from national weather service (NWS)
     The available dates ranges from 01/01/2005 to 06/27/2017
     '''
-
     def __init__(self, web_loc, local_loc, start, end):
         self.web_loc = 'https://water.weather.gov/precip/archive'
         self.local_loc = local_loc
@@ -89,12 +78,12 @@ class NationWeatherServiceDataDownloader:
     def run(self):
         job_list = FileDownloader.range_handler(self.start, self.end)
         links_in = []; files_out = []
+
         for date_ in job_list:
             link_in, dir_out = FileDownloader._make_link(self.web_loc,
                 self.local_loc, date_)
             FileDownloader.file_download(link_in, dir_out)
             print(f'successfully downloaded the rainfall data for {date_}')
-
 
 if __name__ == '__main__':
 
