@@ -10,8 +10,12 @@ class NationWeatherServiceDataDownloader:
     '''
     Downloading Precipitation dataset from national weather service (NWS)
     The available dates ranges from 01/01/2005 to 06/27/2017
+    Args:
+        local_loc (string): the local dir to store data
+        start (string): starting date: e.g. '1990-01-01'
+        end (string): ending date: e.g. '1990-01-30'
     '''
-    def __init__(self, web_loc, local_loc, start, end):
+    def __init__(self, local_loc, start, end):
         self.web_loc = 'https://water.weather.gov/precip/archive'
         self.local_loc = local_loc
         self.start = start
@@ -91,4 +95,4 @@ if __name__ == '__main__':
     from_date = '2015-06-01'
     to_date = '2016-06-01'
 
-    download_handler = FileDownloader(web_loc_, local_loc_, from_date, to_date).run()
+    download_handler = FileDownloader(local_loc_, from_date, to_date).run()
