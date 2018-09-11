@@ -1,9 +1,13 @@
 import os
+import re
 import requests
+
 from datetime import date, timedelta
 import concurrent.futures
+import tarfile
 #example_link
-# ='https://water.weather.gov/precip/archive/2015/10/02/nws_precip_conus_20151002.nc'
+#https://water.weather.gov/precip/archive/2014/01/01/nws_precip_1day_observed_shape_20140101.tar.gz
+
 class nwsDataDownloader:
     '''
     Downloading Precipitation dataset from national weather service (NWS)
@@ -54,8 +58,8 @@ class nwsDataDownloader:
         year_, month_, date_ = date_token.split('-')
         date_nospace = ''.join([year_, month_, date_])
 
-        web_file_name = f'{year_}/{month_}/{date_}/nws_precip_conus_{date_nospace}.nc'
-        local_file_name = date_nospace + '.nc'
+        web_file_name = f'{year_}/{month_}/{date_}/nws_precip_1day_observed_shape_{date_nospace}.tar.gz'
+        local_file_name = date_nospace + '.tar.gz'
 
         link_in = os.path.join(web_repo_loc, web_file_name)
         dir_out = os.path.join(local_loc, local_file_name)
@@ -63,7 +67,7 @@ class nwsDataDownloader:
         return link_in, dir_out
 
     @staticmethod
-    def file_download(in_and_out):
+    def file_download_and_upack(in_and_out):
 
         input_link, name_out = in_and_out
         content = requests.get(input_link)
@@ -73,8 +77,17 @@ class nwsDataDownloader:
                     f.write(chunk)
 
         file_size = os.path.getsize(name_out)
+
         if file_size:
             print(f'finished writing data to file {name_out}')
+
+            dir_, fname = os.path.split(name_out)
+            target_folder_name = re.findall('\d{8}', fname)[0]#8-number, should be date
+
+            with tarfile.open(name_out) as tar:
+                tar.extractall(os.path.join(dir_, target_folder_name))
+
+            os.remove(name_out) #tear down
             return 0
         else:
             raise ValueError('the file is empty. Check the link')
@@ -89,13 +102,15 @@ class nwsDataDownloader:
             in_and_outs.append([link_in, dir_out])
 
         executor = concurrent.futures.ProcessPoolExecutor(max_workers = 8)
-        start_downloading = executor.map(nwsDataDownloader.file_download, in_and_outs)
+        start_downloading = executor.map(nwsDataDownloader.file_download_and_upack, in_and_outs)
+
+
+
 
 if __name__ == '__main__':
 
     local_loc_ = '/Users/haigangliu/SpatialTemporalBayes/rainfall_data_nc'
-    from_date = '2015-06-01'
-    to_date = '2016-06-01'
+    from_date = '2015-06-01'; to_date = '2016-06-01'
 
     download_handler = nwsDataDownloader(local_loc_, from_date, to_date).run()
 
