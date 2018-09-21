@@ -99,9 +99,54 @@ def matrix_padding(input_list, max_padding=None):
 
     return np.array(input_list_copy)
 
+def merge_rain_and_flood(flood_data, rainfall_data, verbose=False):
+
+    '''
+    a brute force method to match locations
+    based on np.close(a,b, precision)
+    a and b will be considered as close enough if the diff is within the specified precison
+
+    '''
+    flood_data_copy = flood_data.copy()
+    nearest_rainfall_info = []
+
+    for index, row in flood_data.iterrows():
+
+        if verbose:
+            print(f'starting analyzing row {index}')
+
+        lat_comp = row['LATITUDE']
+        lon_comp = row['LONGITUDE']
+
+        valid_rain_value = None
+        precision = 0.01
+
+        while not valid_rain_value:
+
+            if verbose:
+                print(f'testing the precision {precision}')
+
+            for idx, row in rainfall_data.iterrows():
+                lat, lon, rain = row
+                lat_equal = np.isclose(lat,lat_comp, atol=precision)
+                lon_equal = np.isclose(lon,lon_comp, atol=precision)
+
+                if lat_equal and lon_equal:
+
+                    valid_rain_value = rain
+                    nearest_rainfall_info.append(valid_rain_value)
+                    break
+
+            precision = precision + 0.05
+
+    flood_data_copy['PRCP'] = nearest_rainfall_info
+    return flood_data_copy
+
+
 if __name__ == '__main__':
     daily_flood = load_flood_data(option='daily')
     flood_with_watershed = water_shed_lookup(daily_flood, key='SITENUMBER')
+
     f_NM, f_AM, f_WM = generate_adjacent_matrix(flood_with_watershed, 'WATERSHED')
     padded_weights_f = matrix_padding(f_AM)
     padded_adj_f = matrix_padding(f_WM)
