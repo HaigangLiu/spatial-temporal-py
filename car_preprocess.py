@@ -1,9 +1,7 @@
 import os
-from SampleDataLoader import load_flood_data
 import geopandas as gpd
 import numpy as np
 from shapely.geometry import Point
-
 
 class ArealDataPreprocessor:
 
@@ -24,7 +22,7 @@ class ArealDataPreprocessor:
     def _lookup_watershed(self):
         '''
         for each location, find which watershed it belongs to.
-        A attribute data will be generated which is new
+        A attribute 'data' will be generated which is a new
         dataframe with an additional column called WATERSHED
         '''
         huc8_units = gpd.read_file(self.watershed_file)
@@ -55,6 +53,13 @@ class ArealDataPreprocessor:
 
     def _generate_adjacent_matrix(self):
 
+        '''
+        find the adjacent matrix and weight matrix for each location
+        based on the dummy variable of region ('WATERSHED')
+        returns:
+            adjacent_matrix, index for neighbors. [2, 4] means the touch border with 3rd and 5th observation
+            weight_matrix: replace all elements in adjacent matrix with 1.
+        '''
         watershed_list = self.data['WATERSHED']
         neighbor_matrix = [] # an n by n matrix, 1 for adjcent, 0 for not.
         adjacent_matrix = []
@@ -74,7 +79,14 @@ class ArealDataPreprocessor:
         return adjacent_matrix, weight_matrix
 
     def _generate_padded_matrix(self, input_list):
-
+        '''
+        construct the matrix of W by making sure that every
+        row has the same length.
+        args:
+            input list (list): a list of spatial information for each location
+        return:
+            the padded matrix with rows of equal length.
+        '''
         max_vector_length = max([len(row) for row in input_list])
         input_list_copy = input_list.copy()
 
@@ -84,18 +96,30 @@ class ArealDataPreprocessor:
         return np.array(input_list_copy)
 
     def _method_dispatcher(self):
+        '''
+        make available 4 attributes for the object
+            data: dataframe with one more column of watershed
+            adjacent_matrix: index of neighbors
+            weight_matrix: weights of neighbors
+            padded_weight_matrix: weights of neighbors, length of each row is the same
+            padded_adjacent_matrix: index of neighbors, padded with 0 to make sure equal length for each row
+
+        '''
         self.data = self._lookup_watershed()
         self.adjacent_matrix, self.weight_matrix = self._generate_adjacent_matrix()
         self.padded_weight_matrix = self._generate_padded_matrix(self.weight_matrix)
         self.padded_adjacent_matrix = self._generate_padded_matrix(self.adjacent_matrix)
 
-daily_flood = load_flood_data(option='daily')
-areal_data = ArealDataPreprocessor( daily_flood, key='SITENUMBER')
-print(areal_data.data)
-print(areal_data.adjacent_matrix)
-print(areal_data.weight_matrix)
-print(areal_data.padded_weight_matrix)
-print(areal_data.padded_adjacent_matrix)
+if __name__ == '__main__':
+
+    from SampleDataLoader import load_flood_data
+    daily_flood = load_flood_data(option='daily')
+    areal_data = ArealDataPreprocessor( daily_flood, key='SITENUMBER')
+    print(areal_data.data)
+    print(areal_data.adjacent_matrix)
+    print(areal_data.weight_matrix)
+    print(areal_data.padded_weight_matrix)
+    print(areal_data.padded_adjacent_matrix)
 
 
 
