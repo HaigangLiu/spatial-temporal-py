@@ -70,7 +70,6 @@ class ArealModelPreprocessor:
         return np.array(input_list_copy)
 
     def run(self):
-
         adjacent_matrix_, weight_matrix_ = self.generate_adjacent_matrix()
         adjacent_matrix = self.pad_matrix(adjacent_matrix_)
         weight_matrix = self.pad_matrix(weight_matrix_)
@@ -101,22 +100,19 @@ class ArealModel:
         self.weight_matrix = weight_matrix
 
     def fit(self):
-        self.model_car = pm.Model()
-        with self.model_car:
-            # beta_0 = pm.Normal('beta_0', mu = 0, tau = 10e-5)
-            # beta_1 = pm.Normal('beta_1', mu = 0, tau = 10e-5)
+        with pm.Model() as self.model_car:
+            beta_0 = pm.Normal('beta_0', mu=0, tau = 10e-5)
+            beta_1 = pm.Normal('beta_1', mu=0, tau = 10e-5)
 
-            # tau_h = pm.Gamma('tau_h', alpha=1, beta=1.0)
+            tau_h = pm.Gamma('tau_h', alpha=1, beta=1.0)
             tau_c = pm.Gamma('tau_c', alpha=1.0, beta=1.0)
-            # sd = pm.Gamma('tau_d', alpha=1.0, beta=1.0)
 
-            theta = pm.Normal('theta', mu=0.0, sd=3, shape=1)
             mu_phi = CAR('mu_phi', w=self.weight_matrix, a=self.adjacent_matrix, tau=tau_c, shape=self.N)
+            phi = pm.Deterministic('phi', mu_phi-tt.mean(mu_phi))
 
-            # mu_total = pm.Deterministic('mu', )
-
-            Yi = pm.Normal('Yi', mu=mu_phi + theta*x, sd=3,  observed=y)
-
+            mu = pm.Deterministic('mu', beta_0 + beta_1*self.x + phi)
+            theta  = pm.Gamma('theta', alpha=1.0, beta=1.0)
+            Yi = pm.Normal('Yi', mu=mu, sd=theta, observed= np.log(self.y))
             trace = pm.sample(5000, cores=2, tune=1000)
 
         return trace
@@ -127,61 +123,11 @@ if __name__ == '__main__':
     temp_data = temp_data[~np.isnan(temp_data.GAGE_MAX)]
     temp_data = temp_data[~np.isnan(temp_data.PRCP)]
 
-    weight_matrix, adjacent_matrix = ArealModelPreprocessor(temp_data, key='SITENUMBER').run()
+    adjacent_matrix, weight_matrix = ArealModelPreprocessor(temp_data, key='SITENUMBER').run()
 
     x = temp_data['PRCP'].values
     y = temp_data['GAGE_MAX'].values
 
     model = ArealModel(y, x, adjacent_matrix, weight_matrix)
     trace = model.fit()
-
-
-
-    # dataframe = areal_data.data
-    # adjacent_matrix = areal_data.adjacent_matrix
-    # weight_matrix = areal_data.weight_matrix
-    # padded_weight_matrix = areal_data.padded_weight_matrix
-    # padded_adjacent_matrix = areal_data.padded_adjacent_matrix
-    # x = dataframe['PRCP'].values
-    # y = dataframe['GAGE_MAX'].values
-    # N = len(x)
-
-
-# class CAR(distribution.Continuous):
-
-#     def __init__(self, w, a, tau, *args, **kwargs):
-#         super().__init__(*args, **kwargs)
-#         self.mode = 0.
-#         self.a = a = tt.as_tensor_variable(a)
-#         self.w = w = tt.as_tensor_variable(w)
-#         self.tau = tau*tt.sum(w, axis=1)
-
-#     def compute_mu_elementwise(self, x):
-#         mu_w, _ = scan(fn= lambda w, a: tt.sum(w*x[a])/tt.sum(w), sequences=[self.w, self.a])
-#         return mu_w
-
-#     def logp(self, x):
-#         mu_w = self.compute_mu_elementwise(x)
-#         return tt.sum(continuous.Normal.dist(mu=mu_w, tau=self.tau).logp(x))
-
-
-# model_car = pm.Model()
-
-# with model_car:
-#     # beta_0 = pm.Normal('beta_0', mu = 0, tau = 10e-5)
-#     # beta_1 = pm.Normal('beta_1', mu = 0, tau = 10e-5)
-
-#     # tau_h = pm.Gamma('tau_h', alpha=1, beta=1.0)
-#     tau_c = pm.Gamma('tau_c', alpha=1.0, beta=1.0)
-#     # sd = pm.Gamma('tau_d', alpha=1.0, beta=1.0)
-
-#     theta = pm.Normal('theta', mu=0.0, sd=3, shape=N)
-#     mu_phi = CAR('mu_phi', w=padded_weight_matrix, a=padded_adjacent_matrix, tau=tau_c, shape=N)
-
-#     # mu_total = pm.Deterministic('mu', )
-
-#     Yi = pm.Normal('Yi', mu=mu_phi + theta*x, sd=3,  observed=y)
-
-#     trace = pm.sample(5000, cores=2, tune=1000)
-
 
