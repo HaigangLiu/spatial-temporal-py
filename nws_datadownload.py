@@ -20,7 +20,7 @@ class nwsDataDownloader:
             default value is south carolina
         to_pd (boolean): if true, the data will be converted to pandas dataframe before output.
     '''
-    def __init__(self, local_loc, start, end, rm_na=True, var_name='GLOBVALUE', region=None, to_pd=True):
+    def __init__(self, local_loc, start, end, rm_na=True, var_name='GLOBVALUE', region=None, to_pd=True, fill_missing_locs=True):
         self.web_loc = 'https://water.weather.gov/precip/archive'
         self.local_loc = local_loc
         self.start = start
@@ -29,6 +29,7 @@ class nwsDataDownloader:
         self.var_name = var_name #response variable name
         self.region = region # the region user is interested in
         self.to_pd = to_pd #output a pandas dataframe
+        self.fill_missing_locs = fill_missing_locs
 
     @staticmethod
     def range_handler(start_date, end_date):
@@ -75,7 +76,37 @@ class nwsDataDownloader:
 
         return link_in, dir_out
 
-    def post_process(self, shp_file):
+    def _fill_missing_locs(self, output_df, where='SC'):
+        '''
+        fill the un-observed locations with 0
+        Args:
+        output_df (pandas dataframe): the data frame with rainfall and location information
+        where (optional, string) allows user to choose the state, default value is
+        '''
+        if where == 'SC':
+            original_file = './all_locations/all_locs.csv'
+        print('this function was called')
+
+        all_locs = pd.read_csv(original_file, index_col=0).round(4)
+        subset_locs = output_df.round(4)
+
+        all_locs_list = all_locs.values.tolist()
+        subset_locs_list = subset_locs[['LATITUDE','LONGITUDE']].values.tolist()
+
+        zeros = []
+        for loc in all_locs_list:
+            if loc not in subset_locs_list:
+                loc.append(0.0)
+                zeros.append(loc)
+
+        zeros_df = pd.DataFrame(zeros, columns=['LATITUDE','LONGITUDE', 'PRCP'] )
+        df_filled = pd.concat([subset_locs, zeros_df], axis = 0)
+
+        delta = df_filled.shape[0] - subset_locs.shape[0]
+        print(f'{delta} more observations have been added to the dataset')
+        return df_filled
+
+    def process(self, shp_file):
 
         region_mask = []
 
@@ -108,9 +139,13 @@ class nwsDataDownloader:
         if self.to_pd:
             numpy_array = output[['LAT', 'LON', self.var_name]].values
             output = pd.DataFrame(numpy_array, columns=['LATITUDE', 'LONGITUDE', 'PRCP'])
+
+        if self.fill_missing_locs:
+            output = self._fill_missing_locs(output)
+
         return output
 
-    def file_download_and_upack(self, in_and_out):
+    def file_download_and_process(self, in_and_out):
 
         input_link, name_out = in_and_out
         content = requests.get(input_link)
@@ -136,10 +171,10 @@ class nwsDataDownloader:
             for file in os.listdir(abs_target_folder):
                 if file.endswith('.shp'):
                     file_abs = os.path.join(abs_target_folder, file)
-                    output_from_post_process = self.post_process(file_abs)
+                    output_from_process = self.process(file_abs)
 
                     csv_name = abs_target_folder + '.csv'
-                    output_from_post_process.to_csv(csv_name)
+                    output_from_process.to_csv(csv_name)
             return 0
         else:
             raise ValueError('the file is empty. Check the link')
@@ -154,12 +189,12 @@ class nwsDataDownloader:
             in_and_outs.append([link_in, dir_out])
 
         executor = concurrent.futures.ProcessPoolExecutor(max_workers = 8)
-        start_downloading = executor.map(self.file_download_and_upack, in_and_outs)
+        start_downloading = executor.map(self.file_download_and_process, in_and_outs)
 
 if __name__ == '__main__':
     #example_link
     #https://water.weather.gov/precip/archive/2014/01/01/nws_precip_1day_observed_shape_20140101.tar.gz
 
-    local_loc_ = '/Users/haigangliu/SpatialTemporalBayes/rainfall_data_nc'
-    from_date = '2015-06-01'; to_date = '2016-06-01'
+    local_loc_ = '/Users/haigangliu/SpatialTemporalBayes/rainfall_data_nc2'
+    from_date = '2007-01-01'; to_date = '2017-01-01'
     download_handler = nwsDataDownloader(local_loc_, from_date, to_date).run()
