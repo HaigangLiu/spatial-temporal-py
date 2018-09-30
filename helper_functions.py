@@ -90,6 +90,6 @@ if __name__ == '__main__':
 
     for state in data.keys():
         locs, _ = get_state_information(state)
-        abs_dir = os.path.join(abs_dir, state+'.csv')
+        abs_dir = os.path.join('./state_shapes', state+'.csv')
         locs.to_csv(abs_dir)
         print(f'finished processing state {state}')
