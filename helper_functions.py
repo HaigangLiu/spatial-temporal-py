@@ -46,7 +46,7 @@ def get_state_range(state_name):
             return None
     return data[state_name]
 
-def get_state_information(state_name='South Carolina'):
+def get_state_contours(state_name='South Carolina'):
     '''
     generate the dataframe file with all available locations for a certain state
     method:
@@ -80,7 +80,11 @@ def get_state_information(state_name='South Carolina'):
             in_domain.append(False)
 
     in_domain_points = pre_screened_points[in_domain]
-    state_locations = in_domain_points[['LAT', 'LON']].round(4)
+    if len(in_domain_points) > 0:
+        state_locations = in_domain_points[['LAT', 'LON']].round(4)
+    else:
+        print(f'no observational locations found in {state_name}')
+        return None
     return state_locations, state_contour
 
 if __name__ == '__main__':
@@ -89,7 +93,8 @@ if __name__ == '__main__':
     data = json.load(jsonfile)
 
     for state in data.keys():
-        locs, _ = get_state_information(state)
+
+        locs, _ = get_state_contours(state)
         abs_dir = os.path.join('./state_shapes', state+'.csv')
         locs.to_csv(abs_dir)
         print(f'finished processing state {state}')
