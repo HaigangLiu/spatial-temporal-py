@@ -48,7 +48,7 @@ class nwsDataDownloader:
                     lats.append(lat)
                     lons.append(lon)
 
-            self.all_points_set = set((float(x),float(y)) for x, y in zip(lats,lons))
+            self.all_points_set = set((round(float(x),4),round(float(y),4)) for x, y in zip(lats,lons))
 
     @staticmethod
     def range_handler(start_date, end_date):
