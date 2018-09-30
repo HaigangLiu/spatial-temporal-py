@@ -1,10 +1,12 @@
-import os, re, tarfile, requests
+import os, re, tarfile, requests, fiona
 from datetime import date, timedelta
+from shutil import rmtree
 import concurrent.futures
 import pandas as pd
 import numpy as np
 import geopandas as gpd
 from shapely.geometry import Point
+from shapely.prepared import prep
 
 class nwsDataDownloader:
     '''
@@ -14,22 +16,39 @@ class nwsDataDownloader:
         local_loc (string): the local dir to store data
         start (string): starting date: e.g. '1990-01-01'
         end (string): ending date: e.g. '1990-01-30'
-        rm_na (bool): if true, all locations with missing data will be removed
+
         var_name (str): the name of the variable of interest.
         region (polygon file, optional): the polygon file specifes the area of interest
             default value is south carolina
-        to_pd (boolean): if true, the data will be converted to pandas dataframe before output.
     '''
-    def __init__(self, local_loc, start, end, rm_na=True, var_name='GLOBVALUE', region=None, to_pd=True, fill_missing_locs=True):
+    def __init__(self, local_loc, start, end, var_name='GLOBVALUE', region=None,  fill_missing_locs=True):
         self.web_loc = 'https://water.weather.gov/precip/archive'
         self.local_loc = local_loc
         self.start = start
         self.end = end
-        self.rm_na = rm_na #keep missing value or not
         self.var_name = var_name #response variable name
         self.region = region # the region user is interested in
-        self.to_pd = to_pd #output a pandas dataframe
         self.fill_missing_locs = fill_missing_locs
+
+        if self.region is None:
+            print('by default, all locations within south carolina will be retained')
+            sc_dir = os.path.join(os.getcwd(),'data/shape_file/south_carolina/tl_2010_45_state10.shp')
+            self.region = gpd.read_file(sc_dir)['geometry'][0]
+
+        if self.fill_missing_locs:
+            #generate a set for all locations in the given state
+            all_points = set()
+            location_list_dir = './all_locations/all_locs.csv'
+
+            lats = []; lons =[]
+            with open(location_list_dir) as file:
+                next(file)
+                for line in file.readlines():
+                    index, lat, lon = line.rstrip('\n').split(',')
+                    lats.append(lat)
+                    lons.append(lon)
+
+            self.all_points_set = set((float(x),float(y)) for x, y in zip(lats,lons))
 
     @staticmethod
     def range_handler(start_date, end_date):
@@ -51,11 +70,10 @@ class nwsDataDownloader:
         for i in range(delta.days + 1):
             date_ = str(start_date_formatted + timedelta(i))
             list_of_dates.append(date_)
-
         return list_of_dates
 
     @staticmethod
-    def _make_link(web_repo_loc, local_loc, date_token):
+    def _generate_io_link(web_repo_loc, local_loc, date_token):
         '''
         generate the url for data, and local dir to store the data.
         Args:
@@ -76,73 +94,32 @@ class nwsDataDownloader:
 
         return link_in, dir_out
 
-    def _fill_missing_locs(self, output_df, where='SC'):
-        '''
-        fill the un-observed locations with 0
-        Args:
-        output_df (pandas dataframe): the data frame with rainfall and location information
-        where (optional, string) allows user to choose the state, default value is
-        '''
-        if where == 'SC':
-            original_file = './all_locations/all_locs.csv'
-        print('this function was called')
-
-        all_locs = pd.read_csv(original_file, index_col=0).round(4)
-        subset_locs = output_df.round(4)
-
-        all_locs_list = all_locs.values.tolist()
-        subset_locs_list = subset_locs[['LATITUDE','LONGITUDE']].values.tolist()
-
-        zeros = []
-        for loc in all_locs_list:
-            if loc not in subset_locs_list:
-                loc.append(0.0)
-                zeros.append(loc)
-
-        zeros_df = pd.DataFrame(zeros, columns=['LATITUDE','LONGITUDE', 'PRCP'] )
-        df_filled = pd.concat([subset_locs, zeros_df], axis = 0)
-
-        delta = df_filled.shape[0] - subset_locs.shape[0]
-        print(f'{delta} more observations have been added to the dataset')
-        return df_filled
-
     def process(self, shp_file):
+        shp_file = fiona.open(shp_file)
+        observations = []
 
-        region_mask = []
+        self.region = prep(self.region)
+        all_points_set_copy = self.all_points_set.copy()
 
-        if self.region is None:
-            print('No polygon file specified.')
-            print('by default, all locations within south carolina will be retained')
+        for shp_file_entry in shp_file:
+            p = shp_file_entry['geometry']['coordinates']
+            if self.region.contains(Point(p)):
+                entry = [shp_file_entry['properties'][x] for x in ['LAT','LON','GLOBVALUE']]
 
-            sc_dir = os.path.join(os.getcwd(),'data/shape_file/south_carolina/tl_2010_45_state10.shp')
-            self.region = gpd.read_file(sc_dir)['geometry'][0]
+                if self.fill_missing_locs:
+                    all_points_set_copy.remove(tuple(entry[0:2]))
 
-        geopandas_file = gpd.read_file(shp_file)
-
-        if self.rm_na: #remove na and negative values
-            before = geopandas_file.shape[0]
-            na_mask = np.isnan(geopandas_file[self.var_name])
-
-            geopandas_file = geopandas_file[~na_mask]
-            geopandas_file = geopandas_file[geopandas_file[self.var_name]>=0]
-            after = geopandas_file.shape[0]
-
-            print(f'removed missing data. {before-after} mssing values are removed')
-
-        locs = geopandas_file[['LON', 'LAT']]
-        for _, spatial_point in locs.iterrows():
-            region_mask.append(Point(spatial_point).within(self.region))
-
-        print(f'find {sum(region_mask)} values within in the specified region')
-        output = geopandas_file[region_mask]
-
-        if self.to_pd:
-            numpy_array = output[['LAT', 'LON', self.var_name]].values
-            output = pd.DataFrame(numpy_array, columns=['LATITUDE', 'LONGITUDE', 'PRCP'])
+                if entry[-1] < 0: #handling missing data
+                    entry[-1] = np.nan
+                observations.append(entry)
 
         if self.fill_missing_locs:
-            output = self._fill_missing_locs(output)
+            zero_observations = [list(i) for i in all_points_set_copy]
+            for row in zero_observations:
+                row.append(0)
+            observations.extend(zero_observations)
 
+        output = pd.DataFrame(observations, columns=['LATITUDE', 'LONGITUDE', 'PRCP'])
         return output
 
     def file_download_and_process(self, in_and_out):
@@ -175,26 +152,36 @@ class nwsDataDownloader:
 
                     csv_name = abs_target_folder + '.csv'
                     output_from_process.to_csv(csv_name)
+                    rmtree(abs_target_folder) #clean up
             return 0
         else:
             raise ValueError('the file is empty. Check the link')
             return 1
 
-    def run(self):
+    def run(self, multiprocess=True):
+        '''
+        only turn off multiprocess for debugging.
+        '''
         job_list = nwsDataDownloader.range_handler(self.start, self.end)
         in_and_outs = []
 
         for date_ in job_list:
-            link_in, dir_out = nwsDataDownloader._make_link(self.web_loc,self.local_loc, date_)
+            link_in, dir_out = nwsDataDownloader._generate_io_link(self.web_loc, self.local_loc, date_)
             in_and_outs.append([link_in, dir_out])
 
-        executor = concurrent.futures.ProcessPoolExecutor(max_workers = 8)
-        start_downloading = executor.map(self.file_download_and_process, in_and_outs)
+        if multiprocess:
+            executor = concurrent.futures.ProcessPoolExecutor(max_workers=8)
+            start_downloading = executor.map(self.file_download_and_process, in_and_outs)
+        else:
+            print('multiprocessing has been turned off')
+            for arg in in_and_outs:
+                self.file_download_and_process(arg)
 
 if __name__ == '__main__':
     #example_link
     #https://water.weather.gov/precip/archive/2014/01/01/nws_precip_1day_observed_shape_20140101.tar.gz
 
     local_loc_ = '/Users/haigangliu/SpatialTemporalBayes/rainfall_data_nc2'
-    from_date = '2007-01-01'; to_date = '2017-01-01'
-    download_handler = nwsDataDownloader(local_loc_, from_date, to_date).run()
+    from_date = '2017-01-01'; to_date = '2017-01-02'
+    download_handler = nwsDataDownloader(local_loc_, from_date,
+        to_date, fill_missing_locs=True).run()
