@@ -104,7 +104,7 @@ class nwsDataDownloader:
         for shp_file_entry in shp_file:
             p = shp_file_entry['geometry']['coordinates']
             if self.region.contains(Point(p)):
-                entry = [shp_file_entry['properties'][x] for x in ['LAT','LON','GLOBVALUE']]
+                entry = [round(shp_file_entry['properties'][x],4) for x in ['LAT','LON','GLOBVALUE']]
 
                 if self.fill_missing_locs:
                     all_points_set_copy.remove(tuple(entry[0:2]))
@@ -172,6 +172,7 @@ class nwsDataDownloader:
         if multiprocess:
             executor = concurrent.futures.ProcessPoolExecutor(max_workers=8)
             start_downloading = executor.map(self.file_download_and_process, in_and_outs)
+
         else:
             print('multiprocessing has been turned off')
             for arg in in_and_outs:
