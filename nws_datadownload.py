@@ -1,7 +1,5 @@
-import os, re, tarfile, requests, fiona
-from shutil import rmtree
+import os, re, tarfile, requests, fiona, shutil, numpy
 import concurrent.futures
-import numpy as np
 from shapely.geometry import Point
 from shapely.prepared import prep
 from helper_functions import generate_in_between_dates, get_state_contours
@@ -71,21 +69,22 @@ class RainfallDownloaderByState:
         for shp_file_entry in shp_file:
             coord = [round(c, 4) for c in list(shp_file_entry['geometry']['coordinates'])]
 
-            if self.region.contains(Point(coord)):
+            #if self.region.contains(Point(coord)): #more accurate but slower
+            if tuple(coord) in all_points_set_copy:
                 coord.append(shp_file_entry['properties'][self.var_name])
 
                 if self.fill_missing_locs:
                     all_points_set_copy.remove(tuple(coord[0:2]))
 
                 if coord[-1] < 0: #handling missing data
-                    coord[-1] = np.nan
+                    coord[-1] = numpy.nan
                 observations.append(coord)
 
         if self.fill_missing_locs:
-            zero_observations = [list(i) for i in all_points_set_copy]
-            for row in zero_observations:
+            non_observations = [list(i) for i in all_points_set_copy]
+            for row in non_observations:
                 row.append(0)
-            observations.extend(zero_observations)
+            observations.extend(non_observations)
         return observations
 
     def file_download_and_process(self, in_and_out):
@@ -124,11 +123,11 @@ class RainfallDownloaderByState:
                             row_string = ' '.join([str(i) for i in row])
                             f.write(f"{row_string}\n")
 
-                    rmtree(abs_target_folder) #clean up
+                    shutil.rmtree(abs_target_folder) #clean up
             return 0
         else:
             raise ValueError('the file is empty. Check the link')
-            return 1
+            return None
 
     def run(self, multiprocess=True):
         '''
@@ -153,8 +152,9 @@ class RainfallDownloaderByState:
 if __name__ == '__main__':
     #example_link
     #https://water.weather.gov/precip/archive/2014/01/01/nws_precip_1day_observed_shape_20140101.tar.gz
-
-    local_dir_ = '/Users/haigangliu/SpatialTemporalBayes/rainfall_data_nc2'
-    from_date = '2016-03-06'; to_date = '2016-03-06'
-    download_handler = RainfallDownloaderByState(from_date,
-        to_date,local_dir_, fill_missing_locs=True).run()
+    download_handler = RainfallDownloaderByState(start='2015-10-03',
+                                                 end='2015-10-03',
+                                                 local_dir='./rainfall_data_nc2',
+                                                 var_name='GLOBVALUE',
+                                                 state_name='South Carolina',
+                                                 fill_missing_locs=True).run()
