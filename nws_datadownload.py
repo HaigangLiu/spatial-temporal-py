@@ -22,15 +22,17 @@ class RainfallDownloaderByState:
 
         self.web_loc = 'https://water.weather.gov/precip/archive'
         self.local_dir = local_dir
+
         self.start = start
         self.end = end
-        self.var_name = var_name #response variable name
-        self.fill_missing_locs = fill_missing_locs
 
+        self.var_name = var_name #response variable name
+        self.var_name_lowercase = self.var_name.lower().capitalize()
+
+        self.fill_missing_locs = fill_missing_locs
         points, _ = get_state_contours(state_name)
         lats = numpy.round(points.LAT.values, 4)
         lons = numpy.round(points.LON.values, 4)
-
         self.all_points_set = set((x, y) for x, y in zip(lons, lats))
 
     @staticmethod
@@ -68,8 +70,11 @@ class RainfallDownloaderByState:
             #if self.region.contains(Point(coord)): #more accurate but slower
             if tuple(coord) in all_points_set_copy:
                 all_points_set_copy.remove(tuple(coord))
+                try:
+                    coord.append(shp_file_entry['properties'][self.var_name])
+                except KeyError:
+                    coord.append(shp_file_entry['properties'][self.var_name_lowercase])
 
-                coord.append(shp_file_entry['properties'][self.var_name])
                 if coord[-1] < 0: #handling missing data
                     coord[-1] = numpy.nan
                 observations.append(coord)
@@ -146,9 +151,9 @@ class RainfallDownloaderByState:
 if __name__ == '__main__':
     #example_link
     #https://water.weather.gov/precip/archive/2014/01/01/nws_precip_1day_observed_shape_20140101.tar.gz
-    download_handler = RainfallDownloaderByState(start='2015-10-03',
-                                                 end='2015-11-03',
+    download_handler = RainfallDownloaderByState(start='2014-07-05',
+                                                 end='2014-07-05',
                                                  local_dir='./rainfall_data_nc2',
                                                  var_name='GLOBVALUE',
                                                  state_name='South Carolina',
-                                                 fill_missing_locs=True).run()
+                                                 fill_missing_locs=True).run(False)
