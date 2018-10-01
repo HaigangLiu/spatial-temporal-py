@@ -17,15 +17,12 @@ class RainfallDownloaderByState:
         region (polygon file, optional): the polygon file specifes the area of interest
             default value is south carolina
     '''
-    def __init__(self, start, end, local_dir, var_name='GLOBVALUE',
-       state_name='South Carolina',  fill_missing_locs=True):
+    def __init__(self, start, end, local_dir, var_name='GLOBVALUE', state_name='South Carolina',  fill_missing_locs=True):
 
         self.web_loc = 'https://water.weather.gov/precip/archive'
         self.local_dir = local_dir
-
         self.start = start
         self.end = end
-
         self.var_name = var_name #response variable name
         self.var_name_lowercase = self.var_name.lower().capitalize()
 
@@ -48,18 +45,15 @@ class RainfallDownloaderByState:
         '''
         year_, month_, date_ = date_token.split('-')
         date_nospace = ''.join([year_, month_, date_])
-
         web_file_name = f'{year_}/{month_}/{date_}/nws_precip_1day_observed_shape_{date_nospace}.tar.gz'
         local_file_name = date_nospace + '.tar.gz'
 
         dir_in = os.path.join(web_url, web_file_name)
         dir_out = os.path.join(local_dir, local_file_name)
-
         return dir_in, dir_out
 
     def process(self, shp_file):
         observations = []
-
         # self.region = prep(self.region)
         all_points_set_copy = self.all_points_set.copy()
 
@@ -134,15 +128,12 @@ class RainfallDownloaderByState:
         '''
         job_list = generate_in_between_dates(self.start, self.end)
         in_and_outs = []
-
         for date_ in job_list:
             link_in, dir_out = RainfallDownloaderByState._generate_io_link(self.web_loc, self.local_dir, date_)
             in_and_outs.append([link_in, dir_out])
-
         if multiprocess:
             executor = concurrent.futures.ProcessPoolExecutor(max_workers=8)
             start_downloading = executor.map(self.file_download_and_process, in_and_outs)
-
         else:
             print('multiprocessing has been turned off')
             for arg in in_and_outs:
