@@ -3,6 +3,7 @@ from datetime import date, timedelta
 from shapely.geometry import Point
 from shapely.prepared import prep
 import geopandas as gpd
+import pandas as pd
 
 def generate_in_between_dates(start_date, end_date):
     '''
@@ -31,6 +32,9 @@ def get_state_range(state_name):
     args:
         state_name: The name of the state. Can be full name or acrynom
             e.g.: either SC or South Carolina works.
+    return:
+        a dictionary of state range. The keys are given as follows:
+            name, min_lat, min_lng, max_lat, max_lng
     '''
     jsonfile = open('./state_shapes/state_boundaries.json')
     data = json.load(jsonfile)
@@ -40,51 +44,72 @@ def get_state_range(state_name):
         full_names = [data[acrynom]['name'] for acrynom in acrynoms]
         lookup_table = {full_name: acrynom for acrynom, full_name in zip(acrynoms, full_names)}
         try:
-            state_name = lookup_table[state_name]
+            state_name = [word.capitalize() for word in state_name.split(' ')]
+            state_name = lookup_table[' '.join(state_name)]
         except KeyError:
             print('Check the spelling of state name')
             return None
     return data[state_name]
 
-def get_state_contours(state_name='South Carolina'):
+def get_state_contours(state_name='South Carolina', use_cache=True):
     '''
-    generate the dataframe file with all available locations for a certain state
+    find the polygon of a given state in the united states,
+    also generate the dataframe file with all available locations for a certain state
+
     method:
-    first use sc_lat_lon_dict to narrow down the lookup range. Then apply a more detailed lookup.
+    first use sc_lat_lon_dict to narrow down the lookup range.
+    Then apply a more detailed lookup by within() function from shapely.
+
     Args:
-        state_name: the name of the state to look up in the NWS database
+        state_name (string): the name of the state to look up in the NWS database
         Can be full name or acrynom. e.g.: either SC or South Carolina works.
+        use_cache (boolean)): will use the cached csv file to speed up the computation if possible
     '''
+    state_information = get_state_range(state_name) #use full name thereafter
+    state_name = state_information['name']
+
+    shape_for_states = gpd.read_file('./state_shapes/cb_2017_us_state_500k.shp')
+    state_contour = shape_for_states[shape_for_states.NAME == state_name]
+
+    if len(state_contour):
+        state_contour = state_contour['geometry'].values[0]
+    else:
+        print(f'There is no contour information for {state_name}')
+        return None, None
+
+    if use_cache:
+        try:
+            file_name = os.path.join('./state_shapes/', state_name + '.csv')
+            state_locations = pd.read_csv(file_name)
+            print(f'loaded cached file for {state_name}')
+            return state_locations, state_contour
+
+        except FileNotFoundError:
+            print('cached file not found. start downloading from national weather service site.')
 
     nws_locations = gpd.read_file('./all_locations/nws_precip_allpoint/nws_precip_allpoint.shp')
-    state_information = get_state_range(state_name)
 
-    state_name = state_information['name']
     m1 = nws_locations.LAT > state_information["min_lat"]
     m2 = nws_locations.LAT < state_information['max_lat']
     m3 = nws_locations.LON > state_information['min_lng']
     m4 = nws_locations.LON < state_information['max_lng']
-
     pre_screened_points = nws_locations[m1 & m2 & m3 & m4]
-    shape_for_states = gpd.read_file('./state_shapes/cb_2017_us_state_500k.shp')
 
-    state_contour = shape_for_states[shape_for_states.NAME ==state_name]['geometry'].values[0]
     state_contour_ = prep(state_contour)
-
-    in_domain = []
+    domain = []
     for idx, row in pre_screened_points.iterrows():
         lon, lat = row[['LON', 'LAT']]
         if state_contour_.contains(Point([lon, lat])):
-            in_domain.append(True)
+            domain.append(True)
         else:
-            in_domain.append(False)
+            domain.append(False)
 
-    in_domain_points = pre_screened_points[in_domain]
+    in_domain_points = pre_screened_points[domain]
     if len(in_domain_points) > 0:
         state_locations = in_domain_points[['LAT', 'LON']].round(4)
     else:
         print(f'no observational locations found in {state_name}')
-        return None
+        return None, None
     return state_locations, state_contour
 
 if __name__ == '__main__':
@@ -92,9 +117,14 @@ if __name__ == '__main__':
     jsonfile = open('./state_shapes/state_boundaries.json')
     data = json.load(jsonfile)
 
-    for state in data.keys():
+    a, b = get_state_contours('VI') #virgin island
+    c, d = get_state_contours('south carolina') #now allow lower case
 
-        locs, _ = get_state_contours(state)
-        abs_dir = os.path.join('./state_shapes', state+'.csv')
-        locs.to_csv(abs_dir)
-        print(f'finished processing state {state}')
+    for state in data.keys(): #for all states
+        result = get_state_contours(state)
+        if result:
+            abs_dir = os.path.join('./state_shapes', data[state]['name']+'.csv')
+            locs, _ = result
+            locs.to_csv(abs_dir)
+            print(f'finished processing state {state}')
+
