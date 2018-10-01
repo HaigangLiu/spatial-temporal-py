@@ -27,14 +27,11 @@ class RainfallDownloaderByState:
         self.var_name = var_name #response variable name
         self.fill_missing_locs = fill_missing_locs
 
-        self.observation_points, self.region = get_state_contours(state_name)
+        points, _ = get_state_contours(state_name)
+        lats = numpy.round(points.LAT.values, 4)
+        lons = numpy.round(points.LON.values, 4)
 
-        if self.fill_missing_locs:
-            all_points = set()
-            lats = self.observation_points.LAT.values
-            lons = self.observation_points.LON.values
-            self.all_points_set = set((round(float(x),4),round(float(y),4)) for
-                x, y in zip(lons, lats))
+        self.all_points_set = set((x, y) for x, y in zip(lons, lats))
 
     @staticmethod
     def _generate_io_link(web_url, local_dir, date_token):
@@ -59,23 +56,20 @@ class RainfallDownloaderByState:
         return dir_in, dir_out
 
     def process(self, shp_file):
-        shp_file = fiona.open(shp_file)
         observations = []
 
-        self.region = prep(self.region)
-        if self.fill_missing_locs:
-            all_points_set_copy = self.all_points_set.copy()
+        # self.region = prep(self.region)
+        all_points_set_copy = self.all_points_set.copy()
 
+        shp_file = fiona.open(shp_file)
         for shp_file_entry in shp_file:
             coord = [round(c, 4) for c in list(shp_file_entry['geometry']['coordinates'])]
 
             #if self.region.contains(Point(coord)): #more accurate but slower
             if tuple(coord) in all_points_set_copy:
+                all_points_set_copy.remove(tuple(coord))
+
                 coord.append(shp_file_entry['properties'][self.var_name])
-
-                if self.fill_missing_locs:
-                    all_points_set_copy.remove(tuple(coord[0:2]))
-
                 if coord[-1] < 0: #handling missing data
                     coord[-1] = numpy.nan
                 observations.append(coord)
@@ -153,7 +147,7 @@ if __name__ == '__main__':
     #example_link
     #https://water.weather.gov/precip/archive/2014/01/01/nws_precip_1day_observed_shape_20140101.tar.gz
     download_handler = RainfallDownloaderByState(start='2015-10-03',
-                                                 end='2015-10-03',
+                                                 end='2015-11-03',
                                                  local_dir='./rainfall_data_nc2',
                                                  var_name='GLOBVALUE',
                                                  state_name='South Carolina',
