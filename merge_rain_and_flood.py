@@ -31,10 +31,18 @@ def location_based_matcher(main_df, query_df, varname):
 
     return main_df_copy
 
-
 def flood_and_rain_merge(main_df, start, end):
+    '''
+    merge the dataframe of different variables.
+    the main dataframe contains, e.g. gage information and locations
+    and for each location, we find the nearest rainfall information based on another dataframe.
+
+    Args
+    main_df (pandas dataframe): dataframe with location information indexed by latitude and longitude
+    start (string): the start date. format should be 1990-09-09
+    end (end): the end date. the format should be the same with start
+    '''
     main_df_copy = main_df.copy()
-    #select a time frame
     timestamps = pd.to_datetime(main_df_copy.DATE)
     start, end = pd.to_datetime(start), pd.to_datetime(end)
     boolean_mask = (timestamps > start) & (timestamps < end)
@@ -46,6 +54,7 @@ def flood_and_rain_merge(main_df, start, end):
         df_one_day = df_selected[df_selected.DATE == date]
         daily_prcp_file_name = ''.join(date.split('-')) + '.txt'
         file_dir = os.path.join('./rainfall_nws/', daily_prcp_file_name)
+
         try:
             prcp_for_that_day = pd.read_csv(file_dir, sep=' ')
             merged_rain_and_flood = location_based_matcher(df_one_day, prcp_for_that_day, varname='PRCP')
@@ -57,6 +66,7 @@ def flood_and_rain_merge(main_df, start, end):
     return pd.concat(container, ignore_index=True)
 
 if __name__ == '__main__':
+    #example
     base_file_for_gage = pd.read_csv('./data/flood_data_daily_beta.csv', index_col= 0)
     data = flood_and_rain_merge(base_file_for_gage, '2009-01-01', '2009-06-10')
     print(data.head())
