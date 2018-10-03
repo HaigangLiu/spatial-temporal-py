@@ -1,6 +1,5 @@
 import os
 import pandas as pd
-import numpy as np
 from scipy import spatial
 
 def location_based_matcher(main_df, query_df, varname):
