@@ -1,9 +1,10 @@
 import os, re, tarfile, requests, fiona, shutil, numpy
-import concurrent.futures
-from shapely.geometry import Point
-from shapely.prepared import prep
+# import concurrent.futures
+# from shapely.geometry import Point
+# from shapely.prepared import prep
 from helper_functions import generate_in_between_dates, get_state_contours
 from datetime import datetime
+from multiprocessing import Pool, cpu_count
 
 class RainfallDownloaderByState:
     '''
@@ -91,25 +92,29 @@ class RainfallDownloaderByState:
             observations.extend(non_observations)
         return observations
 
-    def file_download_and_process(self, in_and_out):
+    def file_download_and_process(self, in_and_out, maximum_tries=10):
 
         input_link, name_out = in_and_out
-        content = requests.get(input_link).content
 
-        with open(name_out, 'wb') as f:
-            f.write(content)
-            print(f'finished writing data to file {name_out}')
-        # if os.path.getsize(name_out):
-
-        dir_, fname = os.path.split(name_out)
-        target_folder_name = re.findall('\d{8}', fname)[0]#8-number, should be date
-
-        with tarfile.open(name_out) as tar:
+        for i in range(maximum_tries):
             try:
-                tar.extractall(os.path.join(dir_, target_folder_name))
+                content = requests.get(input_link).content
+                with open(name_out, 'wb') as f:
+                    f.write(content)
+                    dir_, fname = os.path.split(name_out)
+                    target_folder_name = re.findall('\d{8}', fname)[0]#8-number, should be date
+                with tarfile.open(name_out) as tar:
+                    tar.extractall(os.path.join(dir_, target_folder_name))
+                print(f'finished writing data to file {name_out}')
             except EOFError:
-                print('the file is corrupt. Unpacking failed.')
-                return None
+                print(f'connection failed, trying for the {i+2}th time')
+                continue
+            else:
+                break
+        else:
+            print('the file is corrupt. Unpacking failed.')
+            return None
+
 
         os.remove(name_out) #tear down
         abs_target_folder = os.path.join(dir_, target_folder_name)
@@ -118,7 +123,6 @@ class RainfallDownloaderByState:
                 file_abs = os.path.join(abs_target_folder, file)
                 output_from_process = self.process(file_abs)
                 txt_name = abs_target_folder + '.txt'
-                # output_from_process.to_csv(csv_name)
 
                 with open(txt_name, 'w') as f:
                     for row in output_from_process:
@@ -161,22 +165,25 @@ class RainfallDownloaderByState:
             in_and_outs.append([link_in, dir_out])
 
         if multiprocess:
-            executor = concurrent.futures.ProcessPoolExecutor(max_workers=32)
-            start_downloading = executor.map(self.file_download_and_process, in_and_outs)
+            workers = cpu_count()
+            pool = Pool(processes=workers)
+            result = pool.map(self.file_download_and_process, in_and_outs)
+            self.cleaning_up(job_list)
 
         else:
             print('multiprocessing has been turned off')
             for arg in in_and_outs:
                 self.file_download_and_process(arg)
-        self.cleaning_up(job_list)
+            self.cleaning_up(job_list)
 
 
 if __name__ == '__main__':
     #example_link
     #https://water.weather.gov/precip/archive/2014/01/01/nws_precip_1day_observed_shape_20140101.tar.gz
-    download_handler = RainfallDownloaderByState(start='2014-07-06',
-                                                 end='2014-07-09',
+    download_handler = RainfallDownloaderByState(start='2014-07-05',
+                                                 end='2014-07-05',
                                                  local_dir='./rainfall_data_nc_exp/',
                                                  var_name='GLOBVALUE',
                                                  state_name='South Carolina',
-                                                 fill_missing_locs=True).run(False)
+                                                 fill_missing_locs=True).run(True)
+
