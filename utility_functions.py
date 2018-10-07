@@ -3,7 +3,7 @@ import numpy as np
 import pandas as pd
 from datetime import date, timedelta
 import geopandas as gpd
-from shapely.geometry import Point
+from shapely.geometry import Point, shape
 from shapely.prepared import prep
 
 def coordinates_converter(lat_lon_df, R = 3959):
@@ -85,18 +85,16 @@ def get_state_contours(state_name):
     '''
     if len(state_name) == 2:
         state_name = get_state_rectangle(state_name)['name']
-        print(state_name)
-    shape_for_states = gpd.read_file('./state_shapes/cb_2017_us_state_500k.shp')
-    # print(shape_for_states.NAME)
-    state_contour = shape_for_states[shape_for_states.NAME == state_name]
 
-    if len(state_contour):
-        state_contour = state_contour['geometry'].values[0]
+    shape_for_states = fiona.open('./state_shapes/cb_2017_us_state_500k.shp')
+    for row in shape_for_states:
+        if row['properties']['NAME'] == state_name:
+            polygon = shape(row['geometry'])
+            break
     else:
-        print(f'There is no contour information for {state_name}')
+        print(f'cannot find information for {state_name}. check the spelling')
         return None
-    return state_contour
-
+    return polygon
 
 def get_state_grid_points(state_name='South Carolina', use_cache=True):
     '''
@@ -114,10 +112,8 @@ def get_state_grid_points(state_name='South Carolina', use_cache=True):
     '''
     state_information = get_state_rectangle(state_name) #use full name thereafter
     state_name = state_information['name']
-
-    state_contour = get_state_contours(state_name)
-    state_contour_ = prep(state_contour)
-
+    state_contour = prep(get_state_contours(state_name)) # precompiled version;
+    # faster
     if use_cache:
         try:
             file_name = os.path.join('./state_shapes/', '.'.join([state_name, 'csv']))
@@ -146,11 +142,11 @@ def get_state_grid_points(state_name='South Carolina', use_cache=True):
                 if (lat>max_lat) or (lat<min_lat) or (lon<min_lng) or (lon>max_lng):
                     pass
                 else:
-                    if state_contour_.contains(Point([lon, lat])):
+                    if state_contour.contains(shape(line['geometry'])):
                         local_save.write('\t'.join([str(lon), str(lat)]))
                         local_save.write('\n')
     print(f'the grid information has been saved to {abs_file_dir}')
-    return abs_file_dir
+    return pd.read_csv(abs_file_dir, sep='\t')
 
 def get_elevation(input, key=None, lat='LATITUDE', lon='LONGITUDE'):
     '''
@@ -221,7 +217,7 @@ if __name__ == '__main__':
     c = get_state_rectangle('Wisconsin')
     d = get_elevation([33, -81])
     e = get_in_between_dates('1990-01-01','1990-01-04' )
-    print(e)
+    print(b.head())
 
 
 
