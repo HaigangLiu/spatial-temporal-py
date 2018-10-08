@@ -2,11 +2,10 @@ import os, json, fiona, rasterio
 import numpy as np
 import pandas as pd
 from datetime import date, timedelta
-import geopandas as gpd
 from shapely.geometry import Point, shape
 from shapely.prepared import prep
 
-def coordinates_converter(lat_lon_df, R = 3959):
+def coordinates_converter(lat_lon_df, R=3959, lon_first=True):
     """
     Asssuming that earth is a perfect sphere.
     convert lon, lat coordinates of a point to a 3-D vector.
@@ -19,17 +18,26 @@ def coordinates_converter(lat_lon_df, R = 3959):
         except KeyError:
             print('Need LONGITUDE and LATITUDE columns')
             return None
-
-        x =  R * np.cos(lat_r) * np.cos(lon_r)
-        y = R * np.cos(lat_r) * np.sin(lon_r)
-        z = R * np.sin(lat_r)
-
-        output = pd.DataFrame(np.array(list(zip(x, y, z))))
-        output.columns = ['x', 'y', 'z']
-        return output
     else:
-        raise TypeError('the only accepted input type is pandas dataframe')
-        return None
+        if lon_first:
+            lon_r = np.radians(lat_lon_df[:, 0])
+            lat_r = np.radians(lat_lon_df[:, 1])
+            print('assuming that longitude comes first')
+            print('to change this, set lon_first to False')
+        else:
+            lon_r = np.radians(lat_lon_df[:, 1])
+            lat_r = np.radians(lat_lon_df[:, 0])
+            print('assuming that latitude comes first')
+            print('to change this, set lon_first to True')
+
+    x =  R * np.cos(lat_r) * np.cos(lon_r)
+    y = R * np.cos(lat_r) * np.sin(lon_r)
+    z = R * np.sin(lat_r)
+
+    output = pd.DataFrame(np.array(list(zip(x, y, z))))
+    output.columns = ['x', 'y', 'z']
+    return output
+
 
 def get_in_between_dates(start_date, end_date):
     '''
@@ -178,7 +186,7 @@ def get_elevation(input, key=None, lat='LATITUDE', lon='LONGITUDE'):
                 try:
                     vals = f.sample([input])
                     for val in vals:
-                        if val >= 0: #lowest point of sc is sea level
+                        if val[0] >= 0: #lowest point of sc is sea level
                             elevation = val[0]
                 except IndexError:
                     continue
@@ -213,11 +221,12 @@ def get_elevation(input, key=None, lat='LATITUDE', lon='LONGITUDE'):
 if __name__ == '__main__':
 
     a = get_state_contours('Wisconsin')
-    b = get_state_grid_points('Wisconsin')
+    # b = get_state_grid_points('Wisconsin')
     c = get_state_rectangle('Wisconsin')
-    d = get_elevation([33, -81])
+    d = get_elevation([-79, 33.6 ])
     e = get_in_between_dates('1990-01-01','1990-01-04' )
-    print(b.head())
+    # print(b.head())
+    print(d)
 
 
 
