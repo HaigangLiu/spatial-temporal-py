@@ -4,9 +4,27 @@ import os
 import matplotlib.pyplot as plt
 from fill_missing_dates import fill_missing_dates
 
-
 class MissingDataHandler:
+    '''
+    Analyze the missingness of spatial temporal data.
+    get_missing_data_report() will give a table presenting spatial and temporal availablity
+    get_missing_data_table() will color the aforementioned table within a threshold.
+        e.g. a space-time combination with more than 90% data available will be marked as green. red otherwise
+    get_missing_data_tsplot() will generate a time series graph of available
+    station numbers over number of years one's looking at.
 
+    example:
+    >>> hanlder = MissingDataHandler(df_2, 'SITENUMBER', 'DATE', 'GAGE_MAX')
+    >>> plot_ = hanlder.get_missing_data_tsplot()
+    >>> table_ = hanlder.get_missing_data_table(threshold=0.9)
+    >>> report_ = hanlder.get_missing_data_report()
+
+    Args:
+        dataframe(pandas dataframe): the dataset
+        spatial_column(string): the name of the column of station names
+        temporal_column(string): the name of the column of dates
+        variable_column(string): the variable name (PRCP, GAGE or etc.)
+    '''
     def __init__(self, dataframe, spatial_column, temporal_column,
        variable_column):
 
@@ -14,20 +32,17 @@ class MissingDataHandler:
         self.temporal_column = temporal_column
         self.variable_column = variable_column
         self.report = None
-        self.df = dataframe[[spatial_column,temporal_column,variable_column]]
+        self.dataframe = dataframe[[spatial_column,temporal_column,variable_column]]
 
     def get_missing_data_report(self):
 
         if self.report is None:
-
-            self.df[self.temporal_column] = pd.to_datetime(self.df[self.temporal_column]) #set
-            # value
-            self.df = self.df.set_index([self.temporal_column, self.spatial_column]).unstack()
-
-            yearly = self.df.resample('Y').count() #will count non-na automatically
+            self.dataframe[self.temporal_column] = pd.to_datetime(self.dataframe[self.temporal_column]) #set value
+            self.dataframe = self.dataframe.set_index([self.temporal_column, self.spatial_column]).unstack()
+            yearly_non_missing_count = self.dataframe.resample('Y').count() #will count non-na automatically
 
             number_of_days = []; index_ =[]
-            for i in yearly.index:
+            for i in yearly_non_missing_count.index:
                 if i.year%4 == 0:
                     number_of_days.append(366)
                     index_.append(str(i.year))
@@ -35,9 +50,8 @@ class MissingDataHandler:
                     number_of_days.append(365)
                     index_.append(str(i.year))
 
-            yearly.index = index_
-            self.report = (yearly[self.variable_column].T/np.array
-                (number_of_days)).reset_index()
+            yearly_non_missing_count.index = index_
+            self.report = (yearly_non_missing_count[self.variable_column].T/np.array(number_of_days)).reset_index()
 
         return self.report
 
@@ -67,14 +81,11 @@ class MissingDataHandler:
             _ = self.get_missing_data_report()
 
         available_sites = {}
-
         for threshold_ in thresholds:
             year_columns = list(self.report.columns)
-
             while year_columns:
-                completed_years = np.sum(self.report[year_columns] > threshold_, axis=1)
-                bool_col = completed_years == len(year_columns)
-                available_sites[str(len(year_columns))] = self.report.loc[bool_col,self.spatial_column].values
+                completed_years = np.sum(self.report[year_columns] > threshold_, axis=1) == len(year_columns)
+                available_sites[str(len(year_columns))] = self.report.loc[completed_years,self.spatial_column].values
                 year_columns.pop(0)
 
             ts_plot_x = []; ts_plot_y = []
@@ -99,7 +110,3 @@ if __name__ == '__main__':
     plot_ = hanlder.get_missing_data_tsplot()
     table_ = hanlder.get_missing_data_table(threshold=0.9)
     report_ = hanlder.get_missing_data_report()
-
-
-
-
