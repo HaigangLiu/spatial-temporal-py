@@ -10,10 +10,9 @@ class Merger:
     got gage data from columbia. Hence, we intend to merge the auxillary
     variable to the main dataframe.
 
-    User decides which dataframe is the main one and which one is for query purpose, and can specify the start and the end date of the merging operation.
+    User decides which dataframe is the main one and which one is for query purpose,
+    and can specify the start and the end date of the merging operation.
     '''
-
-
     def __init__(self,  main_df, query_df, start, end, varname='PRCP'):
         self.main_df = main_df
         self.query_df = query_df
