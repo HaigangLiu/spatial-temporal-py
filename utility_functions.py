@@ -1,9 +1,12 @@
 import os, json, fiona, rasterio
 import numpy as np
 import pandas as pd
+import geopandas as gpd
 from datetime import date, timedelta
 from shapely.geometry import Point, shape
 from shapely.prepared import prep
+
+path_watershed ='./data/shape_file/hydrologic_HUC8_units/wbdhu8_a_sc.shp'
 
 def coordinates_converter(lat_lon_df, R=3959, lon_first=True):
     """
@@ -200,33 +203,146 @@ def get_elevation(input, key=None, lat='LATITUDE', lon='LONGITUDE'):
         return get_elevation_one_loc(input)
 
     elif isinstance(input, pd.DataFrame):
+        input_df = input.copy()
         if key is None:
             raise ValueError('Need to specify the name of a column of station identifier. e.g. STATIONID ')
         try:
             #construct a summary table to enhance performance
-            summary = input.groupby([key]).first().reset_index()[[key, lon, lat]]
+            summary = input_df.groupby([key]).first().reset_index()[[key, lon, lat]]
 
-            input.set_index(key, inplace=True)
+            input_df.set_index(key, inplace=True)
             for idx, row in summary.iterrows():
                 key, lat, lon = row.values
                 height = get_elevation_one_loc([lat, lon])
-                input.loc[key, 'ELEVATION'] = height
+                input_df.loc[key, 'ELEVATION'] = height
 
         except KeyError:
             print(f'make sure the dataframe contains: LATITUDE, LONGITUDE and {key}')
             return None
-    output = input.reset_index()
-    return output
+    return input_df.reset_index()
+
+
+def get_watershed(input, shapfile=None, key=None, lat=None, lon= None, ):
+    '''
+    for each location, find which watershed it belongs to.
+    A attribute 'data' will be generated which is a new
+    dataframe with an additional column called WATERSHED
+    '''
+    if shapfile is None:
+        huc8_units = gpd.read_file(path_watershed)
+        water_shed_info = huc8_units[['NAME', 'geometry']]
+        # water_shed_info = prep(water_shed_info)
+
+    def get_watershed_for_one_loc(list_):
+        for _, rows in water_shed_info.iterrows():
+                    name, polygon = rows
+                    if Point(list_).within(polygon):
+                        return name
+        else:
+            raise ValueError('watershed not found')
+
+    if isinstance(input, list):
+        print('assuming the format is [longitude, latitude]')
+        print('the unit is measured in meter')
+        return get_watershed_for_one_loc(input)
+
+    elif isinstance(input, pd.DataFrame):
+        input_df = input.copy()
+        if (key is None) or (lat is None) or (lon is None):
+            raise ValueError('Need to specify the name of latitude column and longitude column and station name column')
+        try:
+            summary = input_df.groupby([key]).first().reset_index()[[key, lon, lat]] #better performance
+        except KeyError:
+            print(f'make sure the dataframe contains: LATITUDE, LONGITUDE and {key}')
+            return None
+
+        input_df.set_index(key, inplace=True)
+        for idx, row in summary.iterrows():
+            key_, lat, lon = row.values
+            watershed_name = get_watershed_for_one_loc([lat, lon])
+            input_df.loc[key_, 'WATERSHED'] = watershed_name
+
+        input_df.reset_index(inplace=True)
+
+        if True:
+            number_of_obs = input_df.groupby(['WATERSHED']).count()[key]
+            singular_huc_areas = number_of_obs[number_of_obs<=1].index
+            input_df = input_df[~input_df.WATERSHED.isin(singular_huc_areas)]
+        print('created a new column called WATERSHED to store the huc watershed information')
+        return input_df.reset_index()
+
+
+def get_dict_basins_to_watershed(mode='code', reverse=False):
+    '''
+    generate a dictionary that maps basins to watershed. set reverse to true if
+    users want to go the other way around.
+    Currently only support south carolina because of limited basin information nationwide.
+
+    mode (string): code or name. code will return 8-digit code for watershed.
+    reverse (boolean): if true, will return a dictionary with watershed as key. default is False.
+    '''
+    watersheds = {}
+    with fiona.open(path_watershed) as f:
+        for row in f:
+            name = row['properties']['NAME']
+            key = row['properties']['HUC8']
+            watersheds[key] = name
+
+    temp_container = []
+    with open('./basin_list.txt') as file:
+        each_loc = []
+        for element in file:
+            if element != '\n':
+                each_loc.append(element.strip('\n'))
+            else:
+                temp_container.append(each_loc)
+                each_loc = [] #reset
+                continue
+
+    basins = {}
+    for entry in temp_container:
+        k = entry.pop(0)
+        basins[k] = []
+        for v in entry:
+            basins[k].append(v)
+
+    if reverse:
+        reversed_dict = {}
+        for k, v in basins.items():
+            for v_ in v:
+                reversed_dict[v_] = k
+        basins = reversed_dict
+
+    if mode == 'name':
+        nw_dict ={}
+        for k, v in basins.items():
+            nw_list = [watersheds[v_] for v_ in v]
+            nw_dict[k] = nw_list
+        return nw_dict
+
+    elif mode == 'code':
+        nw_dict = basins
+        return nw_dict
+
+    else:
+        raise ValueError('allow either name (watershed name) or code (8-digit code)')
+        return None
 
 if __name__ == '__main__':
 
-    a = get_state_contours('Wisconsin')
-    # b = get_state_grid_points('Wisconsin')
-    c = get_state_rectangle('Wisconsin')
-    d = get_elevation([-79, 33.6 ])
-    e = get_in_between_dates('1990-01-01','1990-01-04' )
-    # print(b.head())
-    print(d)
+    # a = get_state_contours('Wisconsin')
+    # # b = get_state_grid_points('Wisconsin')
+    # c = get_state_rectangle('Wisconsin')
+    # d = get_elevation(get_watershed)
+    # e = get_in_between_dates('1990-01-01','1990-01-04' )
+    # # print(b.head())
+    # print(d)
+    from SampleDataLoader import load_flood_data
+    ss = load_flood_data('daily')
+    s = get_watershed([-81,33])
+    sss = get_watershed(ss, key='SITENUMBER', lat='LATITUDE',lon='LONGITUDE')
+    print(len(np.unique(sss.WATERSHED)))
+    # sss.to_csv('/Users/haigangliu/Desktop/check_2.csv')
 
 
 
