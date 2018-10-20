@@ -1,12 +1,12 @@
 import os
 import webbrowser
-from utility_functions import get_state_contours
+from folium import Map, Marker, CircleMarker
 from folium.plugins import MarkerCluster
 from folium.features import PolygonMarker
-from folium import Map, Marker, CircleMarker
+from utility_functions import get_state_contours
 
-class VisualizeSpatialData:
-
+class SpatialPlotter:
+    #ask user to provide a central point
     def __init__(self, locations, filename=None, flip=False):
 
         if filename is None:
@@ -86,7 +86,7 @@ class VisualizeSpatialData:
                                 color=color).add_to(self.canvass)
         return self
 
-    def plot(self, open_in_browser=True, save_plot=True):
+    def plot(self, open_in_browser=True):
         output_path = os.path.join(os.getcwd(), self.filename)
         self.canvass.save(output_path)
         print(f'the map has been saved to {self.filename}')
@@ -94,10 +94,8 @@ class VisualizeSpatialData:
             webbrowser.open('file://' + os.path.realpath(output_path))
 
 if __name__ == '__main__':
-    s = VisualizeSpatialData([[34, -80]])
-    s.add_point([[33.9, -80], [33.8, -80], [33.2, -80]])\
-     .add_contour('SC')\
-     .add_value([[33.9, -80, 2], [33.8, -80, 1], [33.2, -80,1]])\
+    s = SpatialPlotter([[34, -80]])
+    s.add_point_clustered([[33.9, -80], [33.8, -80], [33.2, -80]])\
      .plot()
 
 
