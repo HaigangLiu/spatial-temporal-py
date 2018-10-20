@@ -41,7 +41,6 @@ def coordinates_converter(lat_lon_df, R=3959, lon_first=True):
     output.columns = ['x', 'y', 'z']
     return output
 
-
 def get_in_between_dates(start_date, end_date):
     '''
     for a start date and end date, generate the dates in between
@@ -183,19 +182,19 @@ def get_elevation(input, key=None, lat='LATITUDE', lon='LONGITUDE'):
     source_collection = [source_1, source_2, source_3, source_4]
 
     def get_elevation_one_loc(input):
-        elevation = None
+        elevation = []
         for source in source_collection:
             with rasterio.open(source) as f:
                 try:
                     vals = f.sample([input])
                     for val in vals:
-                        if val[0] >= 0: #lowest point of sc is sea level
-                            elevation = val[0]
+                        # if val[0] >= 0: #lowest point of sc is sea level
+                        elevation.append(val[0])
+                        break
                 except IndexError:
                     continue
-                else:
-                    break
-        return elevation
+
+        return max(elevation)
 
     if isinstance(input, list):
         print('assuming the format is [longitude, latitude]')
@@ -219,8 +218,8 @@ def get_elevation(input, key=None, lat='LATITUDE', lon='LONGITUDE'):
         except KeyError:
             print(f'make sure the dataframe contains: LATITUDE, LONGITUDE and {key}')
             return None
+    print('created a new column called ELEVATION to store the height information')
     return input_df.reset_index()
-
 
 def get_watershed(input, shapfile=None, key=None, lat=None, lon= None, ):
     '''
@@ -271,8 +270,22 @@ def get_watershed(input, shapfile=None, key=None, lat=None, lon= None, ):
         print('created a new column called WATERSHED to store the huc watershed information')
         return input_df.reset_index()
 
+def get_watersheds_list(reverse=False):
+    '''
+    get a list of watersheds and their code in a dictionary for SC.
+    reverse: if true, the value and the key will be flipped in the output.
+    '''
+    watersheds_dict = {} #key is code, value is name
+    with fiona.open(path_watershed) as f:
+        for row in f:
+            name = row['properties']['NAME']
+            key = row['properties']['HUC8']
+            watersheds_dict[key] = name
+    if reverse:
+        watersheds_dict = {v: k for k, v in watersheds_dict.items()} #key is name, value is code
+    return watersheds_dict
 
-def get_dict_basins_to_watershed(mode='code', reverse=False):
+def get_dict_basins_to_watershed(source_file=None, mode='name', reverse=False):
     '''
     generate a dictionary that maps basins to watershed. set reverse to true if
     users want to go the other way around.
@@ -281,15 +294,12 @@ def get_dict_basins_to_watershed(mode='code', reverse=False):
     mode (string): code or name. code will return 8-digit code for watershed.
     reverse (boolean): if true, will return a dictionary with watershed as key. default is False.
     '''
-    watersheds = {}
-    with fiona.open(path_watershed) as f:
-        for row in f:
-            name = row['properties']['NAME']
-            key = row['properties']['HUC8']
-            watersheds[key] = name
+    if source_file is None:
+        source_file = './basin_list.txt'
 
+    watersheds_dict = get_watersheds_list(reverse=False) #key is name, value is code
     temp_container = []
-    with open('./basin_list.txt') as file:
+    with open(source_file) as file:
         each_loc = []
         for element in file:
             if element != '\n':
@@ -299,34 +309,24 @@ def get_dict_basins_to_watershed(mode='code', reverse=False):
                 each_loc = [] #reset
                 continue
 
-    basins = {}
+    basin_to_watershed = {} #each basin has what watershed
     for entry in temp_container:
         k = entry.pop(0)
-        basins[k] = []
+        basin_to_watershed[k] = []
         for v in entry:
-            basins[k].append(v)
+            if mode=='name':
+                v = watersheds_dict[v]
+            basin_to_watershed[k].append(v)
+    output_dict = basin_to_watershed.copy()
 
     if reverse:
-        reversed_dict = {}
-        for k, v in basins.items():
-            for v_ in v:
-                reversed_dict[v_] = k
-        basins = reversed_dict
+        watershed_to_basin = {}
+        for k, vs in basin_to_watershed.items():
+            for v in vs:
+                watershed_to_basin[v] = k
+        output_dict = watershed_to_basin.copy()
 
-    if mode == 'name':
-        nw_dict ={}
-        for k, v in basins.items():
-            nw_list = [watersheds[v_] for v_ in v]
-            nw_dict[k] = nw_list
-        return nw_dict
-
-    elif mode == 'code':
-        nw_dict = basins
-        return nw_dict
-
-    else:
-        raise ValueError('allow either name (watershed name) or code (8-digit code)')
-        return None
+    return output_dict
 
 if __name__ == '__main__':
 
@@ -343,6 +343,11 @@ if __name__ == '__main__':
     sss = get_watershed(ss, key='SITENUMBER', lat='LATITUDE',lon='LONGITUDE')
     print(len(np.unique(sss.WATERSHED)))
     # sss.to_csv('/Users/haigangliu/Desktop/check_2.csv')
+
+    print(get_dict_basins_to_watershed(mode='name', reverse=False))
+    print(get_dict_basins_to_watershed(mode='code', reverse=False))
+    print(get_dict_basins_to_watershed(mode='name', reverse=True))
+    print(get_dict_basins_to_watershed(mode='code', reverse=True))
 
 
 
