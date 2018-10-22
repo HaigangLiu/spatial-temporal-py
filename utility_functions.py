@@ -8,7 +8,7 @@ from shapely.prepared import prep
 
 path_watershed ='./data/shape_file/hydrologic_HUC8_units/wbdhu8_a_sc.shp'
 
-def coordinates_converter(lat_lon_df, R=3959, lon_first=True):
+def coordinates_converter(lat_lon_df, lat='LATITUDE', lon='LONGITUDE', R=3959, lon_first=True):
     """
     Asssuming that earth is a perfect sphere.
     convert lon, lat coordinates of a point to a 3-D vector.
@@ -16,10 +16,10 @@ def coordinates_converter(lat_lon_df, R=3959, lon_first=True):
     """
     if isinstance(lat_lon_df, pd.DataFrame):
         try:
-            lon_r = np.radians(lat_lon_df['LONGITUDE'])
-            lat_r = np.radians(lat_lon_df['LATITUDE'])
+            lon_r = np.radians(lat_lon_df[lat])
+            lat_r = np.radians(lat_lon_df[lon])
         except KeyError:
-            print('Need LONGITUDE and LATITUDE columns')
+            print(f'cannot find {lat} and {lon} columns')
             return None
     else:
         if lon_first:
@@ -158,118 +158,6 @@ def get_state_grid_points(state_name='South Carolina', use_cache=True):
     print(f'the grid information has been saved to {abs_file_dir}')
     return pd.read_csv(abs_file_dir, sep='\t')
 
-def get_elevation(input, key=None, lat='LATITUDE', lon='LONGITUDE'):
-    '''
-    find the elevation for given latitude and longitude
-    the input can be of list like [lon, lat]
-    or a dataframe that contains longitude column and latitude column
-
-    Args:
-        input (pandas dataframe, or list)
-        key: if dataframe is given, key must be provided to indicate which
-        column is station name
-    Return:
-        if input is a list:
-            returns the height as a float number
-        if input is dataframe:
-            returns the original dataframe within an additional column for
-            elevation
-    '''
-    source_1 = './data/shape_file/elevation_info/srtm_20_05/srtm_20_05.tif'
-    source_2 = './data/shape_file/elevation_info/srtm_20_06/srtm_20_06.tif'
-    source_3 = './data/shape_file/elevation_info/srtm_21_05/srtm_21_05.tif'
-    source_4 = './data/shape_file/elevation_info/srtm_21_06/srtm_21_06.tif'
-    source_collection = [source_1, source_2, source_3, source_4]
-
-    def get_elevation_one_loc(input):
-        elevation = []
-        for source in source_collection:
-            with rasterio.open(source) as f:
-                try:
-                    vals = f.sample([input])
-                    for val in vals:
-                        # if val[0] >= 0: #lowest point of sc is sea level
-                        elevation.append(val[0])
-                        break
-                except IndexError:
-                    continue
-
-        return max(elevation)
-
-    if isinstance(input, list):
-        print('assuming the format is [longitude, latitude]')
-        print('the unit is measured in meter')
-        return get_elevation_one_loc(input)
-
-    elif isinstance(input, pd.DataFrame):
-        input_df = input.copy()
-        if key is None:
-            raise ValueError('Need to specify the name of a column of station identifier. e.g. STATIONID ')
-        try:
-            #construct a summary table to enhance performance
-            summary = input_df.groupby([key]).first().reset_index()[[key, lon, lat]]
-
-            input_df.set_index(key, inplace=True)
-            for idx, row in summary.iterrows():
-                key, lat, lon = row.values
-                height = get_elevation_one_loc([lat, lon])
-                input_df.loc[key, 'ELEVATION'] = height
-
-        except KeyError:
-            print(f'make sure the dataframe contains: LATITUDE, LONGITUDE and {key}')
-            return None
-    print('created a new column called ELEVATION to store the height information')
-    return input_df.reset_index()
-
-def get_watershed(input, shapfile=None, key=None, lat=None, lon= None, ):
-    '''
-    for each location, find which watershed it belongs to.
-    A attribute 'data' will be generated which is a new
-    dataframe with an additional column called WATERSHED
-    '''
-    if shapfile is None:
-        huc8_units = gpd.read_file(path_watershed)
-        water_shed_info = huc8_units[['NAME', 'geometry']]
-        # water_shed_info = prep(water_shed_info)
-
-    def get_watershed_for_one_loc(list_):
-        for _, rows in water_shed_info.iterrows():
-                    name, polygon = rows
-                    if Point(list_).within(polygon):
-                        return name
-        else:
-            raise ValueError('watershed not found')
-
-    if isinstance(input, list):
-        print('assuming the format is [longitude, latitude]')
-        print('the unit is measured in meter')
-        return get_watershed_for_one_loc(input)
-
-    elif isinstance(input, pd.DataFrame):
-        input_df = input.copy()
-        if (key is None) or (lat is None) or (lon is None):
-            raise ValueError('Need to specify the name of latitude column and longitude column and station name column')
-        try:
-            summary = input_df.groupby([key]).first().reset_index()[[key, lon, lat]] #better performance
-        except KeyError:
-            print(f'make sure the dataframe contains: LATITUDE, LONGITUDE and {key}')
-            return None
-
-        input_df.set_index(key, inplace=True)
-        for idx, row in summary.iterrows():
-            key_, lat, lon = row.values
-            watershed_name = get_watershed_for_one_loc([lat, lon])
-            input_df.loc[key_, 'WATERSHED'] = watershed_name
-
-        input_df.reset_index(inplace=True)
-
-        if True:
-            number_of_obs = input_df.groupby(['WATERSHED']).count()[key]
-            singular_huc_areas = number_of_obs[number_of_obs<=1].index
-            input_df = input_df[~input_df.WATERSHED.isin(singular_huc_areas)]
-        print('created a new column called WATERSHED to store the huc watershed information')
-        return input_df.reset_index()
-
 def get_watersheds_list(reverse=False):
     '''
     get a list of watersheds and their code in a dictionary for SC.
@@ -289,7 +177,7 @@ def get_dict_basins_to_watershed(source_file=None, mode='name', reverse=False):
     '''
     generate a dictionary that maps basins to watershed. set reverse to true if
     users want to go the other way around.
-    Currently only support south carolina because of limited basin information nationwide.
+    Only support South Carolina because of limited basin information nationwide.
 
     mode (string): code or name. code will return 8-digit code for watershed.
     reverse (boolean): if true, will return a dictionary with watershed as key. default is False.
@@ -309,7 +197,7 @@ def get_dict_basins_to_watershed(source_file=None, mode='name', reverse=False):
                 each_loc = [] #reset
                 continue
 
-    basin_to_watershed = {} #each basin has what watershed
+    basin_to_watershed = {} #each basin has which watershed
     for entry in temp_container:
         k = entry.pop(0)
         basin_to_watershed[k] = []
@@ -325,8 +213,15 @@ def get_dict_basins_to_watershed(source_file=None, mode='name', reverse=False):
             for v in vs:
                 watershed_to_basin[v] = k
         output_dict = watershed_to_basin.copy()
-
     return output_dict
+
+def get_state_fullname(state, reverse=False):
+    with open('./state_shapes/state_boundaries.json') as j:
+        data = json.load(j)
+        state_fullname_dict = {k:v['name'] for k, v in data.items()}
+    if reverse:
+        state_fullname_dict = {v:k for k, v in state_fullname_dict.items()}
+    return state_fullname_dict[state]
 
 if __name__ == '__main__':
 
