@@ -3,8 +3,9 @@ import numpy as np
 import geopandas as gpd
 import rasterio
 from shapely.geometry import Point
-from utility_functions import get_in_between_dates
-WATERSHED_PATH ='./data/shape_file/hydrologic_HUC8_units/wbdhu8_a_sc.shp'
+from utility_functions import get_in_between_dates, get_dict_basins_to_watershed
+
+WATERSHED_PATH = './data/shape_file/hydrologic_HUC8_units/wbdhu8_a_sc.shp'
 
 def get_elevation(input, key=None, lat=None, lon=None):
     '''
@@ -14,8 +15,7 @@ def get_elevation(input, key=None, lat=None, lon=None):
 
     Args:
         input (pandas dataframe, or list)
-        key: if dataframe is given, key must be provided to indicate which
-        column is station name
+        key: if dataframe is given, key must be provided to indicate which column is station name
     Return:
         if input is a list:
             returns the height as a float number
@@ -55,7 +55,6 @@ def get_elevation(input, key=None, lat=None, lon=None):
         lat = 'LATITUDE' if lat is None else lat
         lon = 'LONGITUDE' if lon is None else lon
         key = 'SITENUMBER' if key is None else key
-
         try:
             #construct a summary table to enhance performance
             summary = input_df.groupby([key]).first().reset_index()[[key, lon, lat]]
@@ -65,12 +64,13 @@ def get_elevation(input, key=None, lat=None, lon=None):
                 key, lat, lon = row.values
                 height = get_elevation_one_loc([lat, lon])
                 input_df.loc[key, 'ELEVATION'] = height
-
         except KeyError:
             print(f'cannot find one or more of the following column names: {lat}, {lon} and {key}')
             print('please double check the column name')
             return None
+
     print('created a new column called ELEVATION to store the height information')
+    print('-'*20)
     return input_df.reset_index()
 
 def get_watershed(input, shapfile=None, key=None, lat=None, lon=None):
@@ -124,6 +124,7 @@ def get_watershed(input, shapfile=None, key=None, lat=None, lon=None):
             singular_huc_areas = number_of_obs[number_of_obs<=1].index
             input_df = input_df[~input_df.WATERSHED.isin(singular_huc_areas)]
         print('created a new column called WATERSHED to store the huc watershed information')
+        print('-'*20)
         return input_df.reset_index()
 
 def get_historical_median(dataframe, location_id=None, varname=None, delete_empty_loc=True):
@@ -141,7 +142,7 @@ def get_historical_median(dataframe, location_id=None, varname=None, delete_empt
     varname = 'GAGE_MAX' if varname is None else varname
     location_id = 'SITENUMBER' if location_id is None else location_id
     new_name = '_'.join(['HISTORICAL_MEDIAN', varname])
-
+    dev_name = '_'.join(['DEV', varname])
     try:
         location_list = dataframe[location_id].unique().tolist()
         dataframe = dataframe.set_index(location_id) #it's copy. leave original
@@ -155,11 +156,13 @@ def get_historical_median(dataframe, location_id=None, varname=None, delete_empt
                 if np.isnan(series_.median()):
                     print(f'location {location} is dropped because the median is NA')
                     dataframe.drop(dataframe.loc[location].index, axis=0, inplace=True)
-        print(f'added the column {new_name} to the dataframe')
-
     except KeyError:
         print('An error occurred: make sure the column names of variable and location are spelled correctly.')
         return None
+    dataframe[dev_name] = dataframe[varname] - dataframe[new_name]
+    print(f'created the column {new_name} to the dataframe')
+    print(f'created the column {dev_name} to show the change of {varname} relative to {new_name}')
+    print('-'*20)
     return dataframe.reset_index(drop=False)
 
 def apply_imputation(dataframe, spatial_column=None, temporal_column=None,varname=None):
@@ -185,9 +188,11 @@ def apply_imputation(dataframe, spatial_column=None, temporal_column=None,varnam
         print('spatial-related column usually comes as station, or station id. Default value is SITENUMBER')
         print('temporal-related column usually comes as date or year, default value is DATE.')
     end = sum(np.isnan(dataframe[varname])) #test
-    print(begin, end)
-    return dataframe.reset_index(drop=False)
 
+    print('the imputation is done sucessfully.')
+    print(f'there are {begin} missing values in {varname} before and {end} missing values after')
+    print('-'*20)
+    return dataframe.reset_index(drop=False)
 
 def fill_missing_dates(df_original, spatial_column=None, temporal_column=None, fixed_vars=None):
     '''
@@ -198,15 +203,21 @@ def fill_missing_dates(df_original, spatial_column=None, temporal_column=None, f
     fixed_vars (list): specify the variables that does not change with time. e.g. (latitude, longitude, elevations etc.)
         Not specifying this may cause severe missing data issues
     '''
-
     spatial_column = 'SITENUMBER' if spatial_column is None else spatial_column
     temporal_column = 'DATE' if temporal_column is None else temporal_column
 
     df_original = df_original.reset_index(drop=True) #copy
-    unique_days = get_in_between_dates(df_original[temporal_column].min(), df_original[temporal_column].max())
-    print(df_original[spatial_column])
-    unique_locs = pd.unique(df_original[spatial_column])
+    start_date = df_original[temporal_column].min()
+    end_date = df_original[temporal_column].max()
+    unique_days = get_in_between_dates(start_date, end_date)
 
+
+    print('a new record will be added for any missing dates in the file')
+    print(f'starts from {start_date}, ends with {end_date}')
+    print(f'corresponding variables with be filled with NA')
+    print('-'*20)
+
+    unique_locs = pd.unique(df_original[spatial_column])
     number_of_locs = len(unique_locs)
     number_of_days = len(unique_days)
 
@@ -231,6 +242,65 @@ def fill_missing_dates(df_original, spatial_column=None, temporal_column=None, f
     output.drop(drop_list, inplace=True, axis=1)
     output.columns = [column.replace('_x', '') for column in output.columns]
     return output
+
+def filter_missing_data_by_year(dataframe, varname=None, years_from_now=7, threshold=0.9, spatial_column=None, temporal_column=None, last_year=2016):
+
+    varname = 'GAGE_MAX' if varname is None else varname
+    spatial_column = 'SITENUMBER' if spatial_column is None else spatial_column
+    temporal_column = 'DATE' if temporal_column is None else temporal_column
+    begin = len(pd.unique(dataframe[spatial_column]).tolist())
+
+    df_copy = dataframe.copy()
+    df_copy[temporal_column] = pd.to_datetime(df_copy[temporal_column]) #set value
+    df_copy = df_copy.set_index([temporal_column, spatial_column]).unstack()
+    yearly_non_missing_count = df_copy.resample('Y').count() #will count non-na automatically
+
+    number_of_days = []; index_ =[]
+    for i in yearly_non_missing_count.index: #for leap years
+        if i.year%4 == 0:
+            number_of_days.append(366)
+            index_.append(str(i.year))
+        else:
+            number_of_days.append(365)
+            index_.append(str(i.year))
+
+    yearly_non_missing_count.index = index_
+    report = (yearly_non_missing_count[varname].T/np.array(number_of_days)).reset_index()
+
+    #keep list
+    years = [str(last_year-year) for year in range(years_from_now)]
+    report.set_index(spatial_column, inplace=True)
+
+    data_in_range = report[years]
+
+    keeper = data_in_range[data_in_range > threshold]
+    keeper.dropna(axis=0, inplace=True)
+    station_list = keeper.index.tolist()
+
+    mask = dataframe[spatial_column].isin(station_list)
+    end = len(station_list)
+
+    print(f'stations with data completeness less than {threshold} are discarded.')
+    print(f'out of {begin} stations, {end} stations are kept.')
+    print('-'*20)
+    return dataframe[mask]
+
+def get_basin_from_watershed(dataframe, watershed_col_name=None):
+
+    new_source = './basin_list_updated.txt'
+    dict_ = get_dict_basins_to_watershed(new_source, mode='name', reverse=True)
+
+    basin = 'BASIN'; watershed_col_name
+    watershed_col_name = 'WATERSHED' if watershed_col_name is None else watershed_col_name
+    try:
+        dataframe[basin] = dataframe[watershed_col_name].map(dict_)
+    except KeyError:
+        print(f'{watershed_col_name} does not exist. Check the spelling of column name.')
+        return None
+
+    print(f'created the basin information in a column called {basin}')
+    print('-'*20)
+    return dataframe
 
 if __name__ == '__main__':
     from SampleDataLoader import load_rainfall_data
