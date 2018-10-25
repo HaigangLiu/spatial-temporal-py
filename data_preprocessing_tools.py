@@ -7,7 +7,6 @@ from shapely.prepared import prep
 from utility_functions import get_in_between_dates, get_dict_basins_to_watershed
 
 WATERSHED_PATH = './data/shape_file/hydrologic_HUC8_units/wbdhu8_a_sc.shp'
-
 def get_elevation(input, key=None, lat=None, lon=None):
     '''
     find the elevation for given latitude and longitude
@@ -76,6 +75,16 @@ def get_elevation(input, key=None, lat=None, lon=None):
 
 def get_watershed(dataframe, shapefile=None, location_id=None, lat=None, lon=None, singluar_removal=False):
 
+    '''
+    add a column with watershed information
+    Args:
+        dataframe: pandas dataframe
+        shapefile (string, dir to an shp file): shape information of watersheds
+        location_id (string): the name of column of location names/ids
+        lat (string): the name of the column of latitude information
+        lon (string): the name of the column of longitude information
+        singular_removal: boolean if true the isolated locations wille be removed.
+    '''
     shapefile = WATERSHED_PATH if shapefile is None else shapefile
     location_id = 'SITENUMBER' if location_id is None else location_id
     lat = 'LATITUDE' if lat is None else lat
@@ -98,15 +107,12 @@ def get_watershed(dataframe, shapefile=None, location_id=None, lat=None, lon=Non
                 break
 
     dataframe['WATERSHED'] = dataframe[location_id].map(dict_)
-    # dataframe.reset_index(drop=False,inplace=True)
-
     if singluar_removal:
         number_of_obs = dataframe.groupby(['WATERSHED']).count()[key]
         singular_huc_areas = number_of_obs[number_of_obs<=1].index
         dataframe = dataframe[~dataframe.WATERSHED.isin(singular_huc_areas)]
 
     return dataframe
-
 
 def get_historical_median(dataframe, location_id=None, varname=None, delete_empty_loc=True):
     '''
@@ -192,7 +198,6 @@ def fill_missing_dates(df_original, spatial_column=None, temporal_column=None, f
     end_date = df_original[temporal_column].max()
     unique_days = get_in_between_dates(start_date, end_date)
 
-
     print('a new record will be added for any missing dates in the file')
     print(f'starts from {start_date}, ends with {end_date}')
     print(f'corresponding variables with be filled with NA')
@@ -208,13 +213,13 @@ def fill_missing_dates(df_original, spatial_column=None, temporal_column=None, f
 
     summary_file = df_original.groupby(spatial_column).first().reset_index() #copy
     keys = summary_file[spatial_column].tolist()
+
     if fixed_vars:
-        for fixed_var in fixed_vars:
+        for fixed_var in fixed_vars: #write a dict and then lookup
             lookup_t = {k:v for k, v in zip(keys, summary_file[fixed_var].tolist())}
             df_new[fixed_var] = df_new['SITENUMBER_x'].map(lookup_t)
 
     output = pd.merge(df_new, df_original, how='left', left_on=['SITENUMBER_x', 'DATE_x'], right_on=[spatial_column, temporal_column])
-
     drop_list = [column for column in output.columns if column.endswith('_y')]#clean up
     drop_list.extend([temporal_column, spatial_column])
     output.drop(drop_list, inplace=True, axis=1)
@@ -281,11 +286,14 @@ def get_basin_from_watershed(dataframe, watershed_col_name=None):
     return dataframe
 
 if __name__ == '__main__':
-    from SampleDataLoader import load_rainfall_data
-    # rainfall = load_rainfall_data('monthly')
 
-    file_ = pd.read_csv('./data/rainfall_and_flood_10_beta.csv', index_col=0, dtype={'SITENUMBER':str})
-
-    median_added = get_historical_median(file_, varname='GAGE_MAX', location_id= 'SITENUMBER', delete_empty_loc=False)
-    simple_imputatation(median_added, spatial_column='SITENUMBER', varname='GAGE_MAX')
-    print(file_.columns)
+    raw_df = pd.read_csv('./data/rainfall_and_flood_10_beta.csv', index_col=0, dtype={'SITENUMBER': str})
+    raw_df.drop(['index'], axis=1, inplace=True)
+    raw_df = fill_missing_dates(raw_df, fixed_vars = ['LATITUDE','LONGITUDE']) #0.7
+    raw_df = filter_missing_locations(raw_df, varname='GAGE_MAX') #0.5
+    raw_df = apply_imputation(raw_df, varname='GAGE_MAX') #0.4
+    raw_df = get_historical_median(raw_df, varname='GAGE_MAX') #0.3
+    raw_df = get_elevation(raw_df) #0.7
+    raw_df = get_watershed(raw_df) #0.5
+    raw_df = get_basin_from_watershed(raw_df) #0.1
+    raw_df.to_csv('./data/check_out.csv') #13.6 -> 6.3
