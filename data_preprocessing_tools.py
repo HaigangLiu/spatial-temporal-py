@@ -1,8 +1,9 @@
 import pandas as pd
 import numpy as np
-import geopandas as gpd
+import fiona
 import rasterio
-from shapely.geometry import Point
+from shapely.geometry import Point,shape
+from shapely.prepared import prep
 from utility_functions import get_in_between_dates, get_dict_basins_to_watershed
 
 WATERSHED_PATH = './data/shape_file/hydrologic_HUC8_units/wbdhu8_a_sc.shp'
@@ -73,59 +74,39 @@ def get_elevation(input, key=None, lat=None, lon=None):
     print('-'*20)
     return input_df.reset_index()
 
-def get_watershed(input, shapfile=None, key=None, lat=None, lon=None):
-    '''
-    for each location, find which watershed it belongs to.
-    A attribute 'data' will be generated which is a new
-    dataframe with an additional column called WATERSHED
-    '''
-    if shapfile is None:
-        huc8_units = gpd.read_file(WATERSHED_PATH)
-        water_shed_info = huc8_units[['NAME', 'geometry']]
-        # water_shed_info = prep(water_shed_info)
+def get_watershed(dataframe, shapefile=None, location_id=None, lat=None, lon=None, singluar_removal=False):
 
-    def get_watershed_for_one_loc(list_):
-        for _, rows in water_shed_info.iterrows():
-                    name, polygon = rows
-                    if Point(list_).within(polygon):
-                        return name
-        else:
-            raise ValueError('watershed not found')
+    shapefile = WATERSHED_PATH if shapefile is None else shapefile
+    location_id = 'SITENUMBER' if location_id is None else location_id
+    lat = 'LATITUDE' if lat is None else lat
+    lon = 'LONGITUDE' if lon is None else lon
 
-    if isinstance(input, list):
-        print('assuming the format is [longitude, latitude]')
-        print('the unit is measured in meter')
-        return get_watershed_for_one_loc(input)
+    lats_and_lons = dataframe.groupby(location_id).first()[[lat,lon]].reset_index()
 
-    elif isinstance(input, pd.DataFrame):
-        input_df = input.copy()
+    shapes = []; names = []
+    for i in fiona.open(shapefile):
+        names.append(i['properties']['NAME'])
+        shapes.append(prep(shape(i['geometry'])))
 
-        lat = 'LATITUDE' if lat is None else lat
-        lon = 'LONGITUDE' if lon is None else lon
-        key = 'SITENUMBER' if key is None else key
+    dict_ = {}
+    for idx, row in lats_and_lons.iterrows():
+        sitenumber, lat, lon = row.values
+        point = Point([ lon, lat])
+        for watershed_name, shape_ in zip(names, shapes):
+            if shape_.contains(point):
+                dict_[sitenumber] = watershed_name
+                break
 
-        try:
-            summary = input_df.groupby([key]).first().reset_index()[[key, lon, lat]] #better performance
-        except KeyError:
-            print(f'cannot find one or more of the following colums: {lat}, {lon} and {key}')
-            print('please doublec check the column name.')
-            return None
+    dataframe['WATERSHED'] = dataframe[location_id].map(dict_)
+    # dataframe.reset_index(drop=False,inplace=True)
 
-        input_df.set_index(key, inplace=True)
-        for idx, row in summary.iterrows():
-            key_, lat, lon = row.values
-            watershed_name = get_watershed_for_one_loc([lat, lon])
-            input_df.loc[key_, 'WATERSHED'] = watershed_name
+    if singluar_removal:
+        number_of_obs = dataframe.groupby(['WATERSHED']).count()[key]
+        singular_huc_areas = number_of_obs[number_of_obs<=1].index
+        dataframe = dataframe[~dataframe.WATERSHED.isin(singular_huc_areas)]
 
-        input_df.reset_index(inplace=True)
+    return dataframe
 
-        if True:
-            number_of_obs = input_df.groupby(['WATERSHED']).count()[key]
-            singular_huc_areas = number_of_obs[number_of_obs<=1].index
-            input_df = input_df[~input_df.WATERSHED.isin(singular_huc_areas)]
-        print('created a new column called WATERSHED to store the huc watershed information')
-        print('-'*20)
-        return input_df.reset_index()
 
 def get_historical_median(dataframe, location_id=None, varname=None, delete_empty_loc=True):
     '''
@@ -225,15 +206,12 @@ def fill_missing_dates(df_original, spatial_column=None, temporal_column=None, f
     df_new['SITENUMBER_x'] = np.repeat(unique_locs, number_of_days)
     df_new['DATE_x'] = np.tile(unique_days, number_of_locs)
 
-    if fixed_vars is not None:
-        summary_file = df_original.groupby(spatial_column).first().reset_index() #copy
-        df_new.set_index('SITENUMBER_x', inplace=True)
-        for idx, row in summary_file.iterrows():
-            values = row[fixed_vars]
-            identifier = row[spatial_column]
-            for var_to_propagate in fixed_vars:
-                df_new.loc[identifier, var_to_propagate] = values[var_to_propagate]
-        df_new.reset_index(inplace=True)
+    summary_file = df_original.groupby(spatial_column).first().reset_index() #copy
+    keys = summary_file[spatial_column].tolist()
+    if fixed_vars:
+        for fixed_var in fixed_vars:
+            lookup_t = {k:v for k, v in zip(keys, summary_file[fixed_var].tolist())}
+            df_new[fixed_var] = df_new['SITENUMBER_x'].map(lookup_t)
 
     output = pd.merge(df_new, df_original, how='left', left_on=['SITENUMBER_x', 'DATE_x'], right_on=[spatial_column, temporal_column])
 
@@ -243,7 +221,7 @@ def fill_missing_dates(df_original, spatial_column=None, temporal_column=None, f
     output.columns = [column.replace('_x', '') for column in output.columns]
     return output
 
-def filter_missing_data_by_year(dataframe, varname=None, years_from_now=7, threshold=0.9, spatial_column=None, temporal_column=None, last_year=2016):
+def filter_missing_locations(dataframe, varname=None, years_from_now=7, threshold=0.9, spatial_column=None, temporal_column=None, last_year=2016):
 
     varname = 'GAGE_MAX' if varname is None else varname
     spatial_column = 'SITENUMBER' if spatial_column is None else spatial_column
@@ -290,7 +268,7 @@ def get_basin_from_watershed(dataframe, watershed_col_name=None):
     new_source = './basin_list_updated.txt'
     dict_ = get_dict_basins_to_watershed(new_source, mode='name', reverse=True)
 
-    basin = 'BASIN'; watershed_col_name
+    basin = 'BASIN'
     watershed_col_name = 'WATERSHED' if watershed_col_name is None else watershed_col_name
     try:
         dataframe[basin] = dataframe[watershed_col_name].map(dict_)
