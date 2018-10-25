@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import os
 import matplotlib.pyplot as plt
-from fill_missing_dates import fill_missing_dates
+from data_preprocessing_tools import fill_missing_dates
 
 class MissingSpatialTemporalDataHandler:
     '''
@@ -31,13 +31,15 @@ class MissingSpatialTemporalDataHandler:
         self.temporal_column = temporal_column
         self.varname = varname
         self.report = None
-        self.dataframe = dataframe[[spatial_column,temporal_column,varname]]
+        self.dataframe = dataframe
+        self.report = self.get_missing_data_report()
 
     def get_missing_data_report(self):
         if self.report is None:
-            self.dataframe[self.temporal_column] = pd.to_datetime(self.dataframe[self.temporal_column]) #set value
-            self.dataframe = self.dataframe.set_index([self.temporal_column, self.spatial_column]).unstack()
-            yearly_non_missing_count = self.dataframe.resample('Y').count() #will count non-na automatically
+            dataframe = self.dataframe.copy() #don't manipulate original!
+            dataframe[self.temporal_column] = pd.to_datetime(dataframe[self.temporal_column]) #set value
+            dataframe = dataframe.set_index([self.temporal_column, self.spatial_column]).unstack()
+            yearly_non_missing_count = dataframe.resample('Y').count() #will count non-na automatically
 
             number_of_days = []; index_ =[]
             for i in yearly_non_missing_count.index:
@@ -53,9 +55,6 @@ class MissingSpatialTemporalDataHandler:
 
     def get_missing_data_table(self, threshold):
 
-        if self.report is None:
-            _ = self.get_missing_data_report()
-
         def coloring_scheme(cell_value):
             if cell_value > threshold:
                 color = 'green'
@@ -69,7 +68,8 @@ class MissingSpatialTemporalDataHandler:
         print(f'a colored excel file indicating the data completeness has been saved to {dir_}')
         return colored_cell
 
-    def get_qualified_stations(self, years=3, threshold=0.9):
+    def get_qualified_stations(self, years=7, threshold=0.9):
+
         if type(years) == int and years < 11:
             print(f'Data of recent {years} years from 2016 will be examined')
             years = [2016 -i for i in range(years)]
@@ -83,9 +83,6 @@ class MissingSpatialTemporalDataHandler:
             return None
 
         years = [str(year) for year in years]
-        if self.report is None:
-            _ = self.get_missing_data_report()
-
         report = self.report.copy()
         report.set_index(self.spatial_column, inplace=True)
         data_in_range = report[years]
@@ -94,10 +91,15 @@ class MissingSpatialTemporalDataHandler:
         keeper.dropna(axis=0, inplace=True)
         return keeper.index.tolist()
 
-    def get_missing_data_tsplot(self, thresholds=[0.85, 0.88, 0.9, 0.95, 0.975, 0.99], plotname=None):
+    def get_dataframe(self, years=7, threshold=0.9):
+        station_list = self.get_qualified_stations(years=years, threshold=threshold)
+        df = self.dataframe.copy()
 
-        if self.report is None:
-            _ = self.get_missing_data_report()
+        mask = df[self.spatial_column].isin(station_list)
+        selected_stations = df[mask]
+        return selected_stations
+
+    def get_missing_data_tsplot(self, thresholds=[0.85, 0.88, 0.9, 0.95, 0.975, 0.99], plotname=None):
 
         for threshold in thresholds:
             ts_plot_x = []; ts_plot_y = []
@@ -111,11 +113,11 @@ class MissingSpatialTemporalDataHandler:
         plotname = 'missing_data_evaluation.png' if plotname is None else plotname
         plt.title('Available stations counts over 10 years')
         plt.legend([0.85, .88, 0.9, 0.95, 0.975, 0.99])
-        dir_fig = os.path.join(os.getcwd(), plotname)
-        plt.savefig(dir_fig, dpi=250)
+        fig_dir = os.path.join(os.getcwd(), plotname)
+        plt.savefig(fig_dir, dpi=250)
         plt.close()
 
-        print(f'a time series plot of number of avalaible stations change overtime has been saved to {dir_fig}')
+        print(f'a time series plot of number of avalaible stations change overtime has been saved to {fig_dir}')
 
 if __name__ == '__main__':
     df = pd.read_csv('./data/with_height.csv', dtype ={'SITENUMBER':str}, index_col=0 ).reset_index(drop=True)
@@ -127,4 +129,6 @@ if __name__ == '__main__':
     table_ = handler.get_missing_data_table(threshold=0.95)
     report_ = handler.get_missing_data_report()
     output = handler.get_qualified_stations(years=5, threshold=0.9)
-    print(output)
+    output_df = handler.get_dataframe(years=7, threshold=0.9)
+
+    print(output_df.head())
