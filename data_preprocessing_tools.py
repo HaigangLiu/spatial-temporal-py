@@ -12,7 +12,6 @@ def get_elevation(input, key=None, lat=None, lon=None):
     find the elevation for given latitude and longitude
     the input can be of list like [lon, lat]
     or a dataframe that contains longitude column and latitude column
-
     Args:
         input (pandas dataframe, or list)
         key: if dataframe is given, key must be provided to indicate which column is station name
@@ -42,7 +41,7 @@ def get_elevation(input, key=None, lat=None, lon=None):
                 except IndexError:
                     continue
 
-        return max(elevation)
+        return max(0, max(elevation)) #lowest point in sc is 0
 
     if isinstance(input, list):
         print('assuming the format is [longitude, latitude]')
@@ -74,7 +73,6 @@ def get_elevation(input, key=None, lat=None, lon=None):
     return input_df.reset_index()
 
 def get_watershed(dataframe, shapefile=None, location_id=None, lat=None, lon=None, singluar_removal=False):
-
     '''
     add a column with watershed information
     Args:
@@ -285,13 +283,44 @@ def get_basin_from_watershed(dataframe, watershed_col_name=None):
     print('-'*20)
     return dataframe
 
+def get_season_from_dates(dataframe, date_column=None):
+    date_column = 'DATE' if date_column is None else date_column
+    dates = dataframe[date_column].values.tolist()
+    seasons = []
+    for date in dates:
+        month = date.split('-')[1]
+        if month in ['01', '02','12']:
+            seasons.append('winter')
+        elif month in ['03', '04','05']:
+            seasons.append('spring')
+        elif month in ['06', '07', '08']:
+            seasons.append('summer')
+        elif month in ['09', '10', '11']:
+            seasons.append('fall')
+        else:
+            raise ValueError('the month is not readable')
+    dataframe['SEASON'] = np.array(seasons)
+    return dataframe
+
 if __name__ == '__main__':
 
-    raw_df = pd.read_csv('./data/rainfall_and_flood_10_beta.csv', index_col=0, dtype={'SITENUMBER': str})
-    raw_df.drop(['index'], axis=1, inplace=True)
+    # raw_df = pd.read_csv('./data/rainfall_and_flood_10_beta.csv', index_col=0, dtype={'SITENUMBER': str})
+
+    rain_df = pd.read_csv('./demo/SC_20050101-20170627-19b7.txt', delimiter=" ")
+    raw_df = pd.read_csv('./data/flood_data_daily_beta.csv', index_col=0, dtype={'SITENUMBER': str})
     raw_df = fill_missing_dates(raw_df, fixed_vars = ['LATITUDE','LONGITUDE']) #0.7
-    raw_df = filter_missing_locations(raw_df, varname='GAGE_MAX') #0.5
+    from merge_rain_and_flood import Merger
+
+    print('start merging')
+    raw_df = Merger(raw_df, rain_df, '2010-01-01', '2016-12-31').run()
+    print('finished merging')
+    # raw_df.drop(['index'], axis=1, inplace=True)
+    # should fill missing dates first
+    # then merge...
+
+    raw_df = filter_missing_locations(raw_df, varname='GAGE_MAX', threshold=0.85) #0.5
     raw_df = apply_imputation(raw_df, varname='GAGE_MAX') #0.4
+    #explain this part #e
     raw_df = get_historical_median(raw_df, varname='GAGE_MAX') #0.3
     raw_df = get_elevation(raw_df) #0.7
     raw_df = get_watershed(raw_df) #0.5
