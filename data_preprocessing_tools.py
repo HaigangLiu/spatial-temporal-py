@@ -7,6 +7,7 @@ from shapely.prepared import prep
 from utility_functions import get_in_between_dates, get_dict_basins_to_watershed
 
 WATERSHED_PATH = './data/shape_file/hydrologic_HUC8_units/wbdhu8_a_sc.shp'
+
 def get_elevation(input, key=None, lat=None, lon=None):
     '''
     find the elevation for given latitude and longitude
@@ -40,7 +41,6 @@ def get_elevation(input, key=None, lat=None, lon=None):
                         break
                 except IndexError:
                     continue
-
         return max(0, max(elevation)) #lowest point in sc is 0
 
     if isinstance(input, list):
@@ -286,6 +286,7 @@ def get_basin_from_watershed(dataframe, watershed_col_name=None):
 def get_season_from_dates(dataframe, date_column=None):
     date_column = 'DATE' if date_column is None else date_column
     dates = dataframe[date_column].values.tolist()
+
     seasons = []
     for date in dates:
         month = date.split('-')[1]
@@ -302,10 +303,48 @@ def get_season_from_dates(dataframe, date_column=None):
     dataframe['SEASON'] = np.array(seasons)
     return dataframe
 
+def transpose_dataframe(original_df,
+                   temporal_col='DATE',
+                   start=None,
+                   end=None,
+                   key='SITENUMBER',
+                   fixed_variables = ['LATITUDE','LONGITUDE','ELEVATION', 'BASIN'],
+                   time_varying_variables=['PRCP', 'DEV_GAGE_MAX']):
+
+    start = min(original_df[temporal_col]) if start is None else start
+    end = max(original_df[temporal_col]) if end is None else end
+
+    dates_list = get_in_between_dates(start, end)
+    selected_data = original_df[original_df[temporal_col].isin(dates_list)]
+
+    summary_form = selected_data.groupby(key).first()[fixed_variables].reset_index()
+
+    temporal_variable = [key, temporal_col]
+    temporal_variable.extend(time_varying_variables)
+
+    temp = selected_data[temporal_variable]
+    output_df = temp.set_index([key, temporal_col]).unstack()
+
+    new_columns = []
+    for variable_name in time_varying_variables:
+        for month in range(len(dates_list)):
+            new_var_name = '_'.join([variable_name, str(month + 1)])
+            new_columns.append(new_var_name)
+
+    output_df.columns = new_columns
+    output_df.reset_index(inplace=True)
+
+    dataframe = summary_form.merge(output_df, left_on=key, right_on=key, how='inner')
+    return dataframe
+
 if __name__ == '__main__':
 
     # raw_df = pd.read_csv('./data/rainfall_and_flood_10_beta.csv', index_col=0, dtype={'SITENUMBER': str})
 
+    checkout_df = pd.read_csv('./data/check_out.csv', dtype={'SITENUMBER': str}, index_col=0)
+    ss = transpose_dataframe(checkout_df, start='2010-01-01', end='2010-01-02')
+
+    print(get_elevation([ -80.03, 33]))
     rain_df = pd.read_csv('./demo/SC_20050101-20170627-19b7.txt', delimiter=" ")
     raw_df = pd.read_csv('./data/flood_data_daily_beta.csv', index_col=0, dtype={'SITENUMBER': str})
     raw_df = fill_missing_dates(raw_df, fixed_vars = ['LATITUDE','LONGITUDE']) #0.7
@@ -326,3 +365,4 @@ if __name__ == '__main__':
     raw_df = get_watershed(raw_df) #0.5
     raw_df = get_basin_from_watershed(raw_df) #0.1
     raw_df.to_csv('./data/check_out.csv') #13.6 -> 6.3
+
