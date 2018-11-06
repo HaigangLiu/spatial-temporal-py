@@ -66,10 +66,18 @@ class CarModel:
         self.D = np.diag(self.weight_matrix.sum(axis=1))
 
     def _report_credible_interval(self, trace, varname='beta'):
+
         mean = trace[varname].mean(axis=0)
         lower_bound = np.percentile(trace[varname], 2.5, axis=0)
         upper_bound = np.percentile(trace[varname], 97.5, axis=0)
-        for idx in range(len(mean)):
+
+        try:
+            number_of_params = len(mean)
+        except:
+            number_of_params = 1
+
+        for idx in range(number_of_params):
+
             print(f'the mean of beta_{idx} is {mean[idx]}')
             print(f'the 95 percent credible interval for beta_{idx} is ({lower_bound[idx], upper_bound[idx]})')
 
@@ -77,7 +85,6 @@ class CarModel:
 
         with pm.Model() as self.model:
             beta = pm.Normal('beta', mu=0.0, tau=1.0, shape=(self.dim+1, 1))
-
             # Priors for spatial random effects
             tau = pm.Gamma('tau', alpha=2., beta=2.)
             alpha = pm.Uniform('alpha', lower=0, upper=1)
@@ -93,7 +100,7 @@ class CarModel:
 
             if fast_sampling:
                 inference = pm.ADVI()
-                approx = pm.fit(n=5000, method=inference) #until converge
+                approx = pm.fit(n=50000, method=inference) #until converge
                 self.trace = approx.sample(draws=sample_size)
             else:
                 self.trace = pm.sample(sample_size, cores=2, tune=1000)
