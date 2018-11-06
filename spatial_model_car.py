@@ -121,7 +121,8 @@ if __name__ == '__main__':
     m1.fit(fast_sampling=True, sample_size=5000)
 
     #example 2 (two covariates)
-    m2 = CarModel(covariates=np.hstack([cc.PRCP.values[:,None],                               cc.ELEVATION.values[:,None]]),
+    m2 = CarModel(covariates=np.hstack([cc.PRCP.values[:,None],
+                                        cc.ELEVATION.values[:,None]]),
                  locations=cc.BASIN.values,
                  response_var=cc.DEV_GAGE_MAX)
     m2.fit(fast_sampling=True, sample_size=5000)
