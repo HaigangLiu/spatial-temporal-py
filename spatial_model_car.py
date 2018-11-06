@@ -114,7 +114,7 @@ if __name__ == '__main__':
     checkout_df = pd.read_csv('./data/check_out.csv', dtype={'SITENUMBER': str}, index_col=0)
 
     cc = checkout_df[checkout_df.DATE == '2015-10-03']
-    #example 1 (two covariates)
+    #example 1 (one covariate)
     m1 = CarModel(covariates=cc.PRCP.values,
                  locations=cc.BASIN.values,
                 response_var=cc.DEV_GAGE_MAX)
