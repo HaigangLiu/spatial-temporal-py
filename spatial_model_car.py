@@ -5,7 +5,7 @@ import theano.tensor as tt
 class CarModel:
     '''
     Fit a conditional autoregressive model (spatial model)
-    This will NOT work for temporal data.
+    This will NOT work with spatial temporal data.
     To fit spatial temporal model, use spatial_temporal_model module
     Args:
         response_var (np.array): 1-d array for response variable
@@ -71,15 +71,15 @@ class CarModel:
         lower_bound = np.percentile(trace[varname], 2.5, axis=0)
         upper_bound = np.percentile(trace[varname], 97.5, axis=0)
 
-        try:
+        try: #in case param is nd array
             number_of_params = len(mean)
+            for idx in range(number_of_params):
+                print(f'the mean of beta_{idx} is {mean[idx]}')
+                print(f'the 95 percent credible interval for {varname}_{idx} is ({lower_bound[idx], upper_bound[idx]})')
         except:
-            number_of_params = 1
-
-        for idx in range(number_of_params):
-
-            print(f'the mean of beta_{idx} is {mean[idx]}')
-            print(f'the 95 percent credible interval for beta_{idx} is ({lower_bound[idx], upper_bound[idx]})')
+            #number_of_params = 1,  param is 1d array
+            print(f'the mean of {varname} is {mean}')
+            print(f'the 95 percent credible interval for {varname} is ({lower_bound, upper_bound})')
 
     def fit(self, fast_sampling=True, sample_size=3000):
 
@@ -126,6 +126,3 @@ if __name__ == '__main__':
                  locations=cc.BASIN.values,
                  response_var=cc.DEV_GAGE_MAX)
     m2.fit(fast_sampling=True, sample_size=5000)
-
-
-
