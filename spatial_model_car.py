@@ -1,9 +1,10 @@
 import pymc3 as pm
 import numpy as np
 import theano.tensor as tt
+
 class CarModel:
     '''
-    fit a conditional autoregressive model (spatial model)
+    Fit a conditional autoregressive model (spatial model)
     This will NOT work for temporal data.
     To fit spatial temporal model, use spatial_temporal_model module
     Args:
@@ -20,6 +21,7 @@ class CarModel:
         try:
             self.dim = covariates.shape[1]
             self.covariates = np.hstack((covariates, np.ones((self.N, 1))))
+
         except IndexError:
             self.dim = 1
             self.covariates = np.hstack((covariates[:, None], np.ones((self.N, 1)), ))
@@ -95,6 +97,7 @@ class CarModel:
                 self.trace = approx.sample(draws=sample_size)
             else:
                 self.trace = pm.sample(sample_size, cores=2, tune=1000)
+
         self._report_credible_interval(self.trace, 'beta')
         self._report_credible_interval(self.trace, 'tau')
 
