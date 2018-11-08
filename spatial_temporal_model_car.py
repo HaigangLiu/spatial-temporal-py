@@ -4,9 +4,9 @@ import theano.tensor as tt
 
 class CarModel:
     '''
-    Fit a conditional autoregressive model (spatial model)
-    This will NOT work with spatial temporal data.
-    To fit spatial temporal model, use spatial_temporal_model module
+    Fit a conditional autoregressive model (spatial-temporal model)
+    This may NOT work with spatial data (not tested for that case);
+    To fit spatial  model, use spatial_model module
     Args:
         response_var (np.array): 1-d array for response variable
         location_var: 1-d array to store location information
@@ -16,11 +16,25 @@ class CarModel:
 
         self.response_var = response_var
         self.locations = locations
-        self.N = self.response_var.shape[0]
+        self.N = self.response_var.shape[0] # N is number of locations
         self.number_of_days = response_var.shape[1]
+        self.covariates = covariates
 
-        self.dim = int(covariates.shape[1]/self.number_of_days)
-        self.covariates = np.hstack((covariates, np.ones((self.N, self.number_of_days))))
+        if self.number_of_days <= 1:
+            raise ValueError('the data only contains info of one day. Use spatial module instead')
+        if self.covariates.shape[1]%self.number_of_days != 0:
+            example_1 = f'if y is {self.N}x{self.number_of_days}, '
+            example_2 = f'then the second dim of x has to be a muliple of {self.number_of_days}'
+            raise ValueError(example_1 + example_2)
+        else:
+            self.dim = int(self.covariates.shape[1]/self.number_of_days)
+        self.intercepts = np.ones((self.N, self.number_of_days))
+
+        print('-'*20)
+        print('BASIC INFO FROM INPUT')
+        print(f'The sample size is {self.N}.')
+        print(f'The time span is {self.number_of_days} days, and there are {self.dim} covariates in the model')
+        print('Double check the input if any of these information does not seem right.')
 
         self.weight_matrix = None
         self.adjacent_matrix = None
@@ -61,64 +75,100 @@ class CarModel:
         self.weight_matrix = wmat2
         self.D = np.diag(self.weight_matrix.sum(axis=1))
 
-    # def _report_credible_interval(self, trace, varname='beta'):
-
-    #     mean = trace[varname].mean(axis=0)
-    #     lower_bound = np.percentile(trace[varname], 2.5, axis=0)
-    #     upper_bound = np.percentile(trace[varname], 97.5, axis=0)
-
-    #     try: #in case param is nd array
-    #         number_of_params = len(mean)
-    #         for idx in range(number_of_params):
-    #             print('-'*20)
-    #             print(f'the mean of beta_{idx} is {mean[idx][0]}')
-    #             print(f'the 95 percent credible interval for {varname}_{idx} is {lower_bound[idx][0], upper_bound[idx][0]}')
-    #     except:
-    #         #number_of_params = 1,  param is 1d array
-    #         print('-'*20)
-    #         print(f'the mean of {varname} is {mean}')
-    #         print(f'the 95 percent credible interval for {varname} is {lower_bound, upper_bound}')
-
     def fit(self, fast_sampling=True, sample_size=3000):
 
+        if self.dim > 1:
+            where_to_slice = [self.number_of_days*i for i in range(self.dim)]
+            where_to_slice.pop(0)
+            self.covariates_split = np.hsplit(self.covariates, where_to_slice)
+        else:
+            self.covariates_split = [self.covariates]
+
         with pm.Model() as self.model:
-            beta = pm.Normal('beta', mu=0.0, tau=1.0, shape=60)
+            beta_variables = []
+            beta_names = []
+            for i in range(self.dim+1):
+                var_name = '_'.join(['beta', str(i)])
+                beta_names.append(var_name)
+                beta_variables.append(pm.Normal(var_name, mu=0.0, tau=1.0))
+
             # Priors for spatial random effects
             tau = pm.Gamma('tau', alpha=2., beta=2.)
             alpha = pm.Uniform('alpha', lower=0, upper=1)
             phi = pm.MvNormal('phi',
                               mu=0,
                               tau=tau*(self.D - alpha*self.weight_matrix),
-                              shape=(self.number_of_days, self.N)
+                              shape=(self.number_of_days, self.N) #30 x 94 sample size by dim
                               )
+
+            beta_0 = beta_variables.pop(0)
+            mu_ = self.intercepts*beta_0 + phi.T
+            for idx, beta_ in enumerate(beta_variables):
+                mu_ = mu_ + beta_*self.covariates_split[idx]
+
             # Mean model
-            mu = pm.Deterministic('mu', tt.dot(self.covariates, beta) + phi.T)
+            mu = pm.Deterministic('mu', mu_)
             theta_sd  = pm.Gamma('theta_sd', alpha=1.0, beta=1.0)
             # Likelihood
             Yi = pm.Normal('Yi', mu=mu, tau=theta_sd, observed=self.response_var)
 
             if fast_sampling:
                 inference = pm.ADVI()
-                approx = pm.fit(n=50000, method=inference) #until converge
+                approx = pm.fit(n=25000, method=inference) #until converge
                 self.trace = approx.sample(draws=sample_size)
             else:
                 self.trace = pm.sample(sample_size, cores=2, tune=5000)
 
-        # self._report_credible_interval(self.trace, 'beta')
-        # self._report_credible_interval(self.trace, 'tau')
+            for beta_name in beta_names:
+                self.report_credible_interval(self.trace, beta_name)
+
+    def report_credible_interval(self, trace, varname='beta'):
+        mean = trace[varname].mean(axis=0)
+        lower_bound = np.percentile(trace[varname], 2.5, axis=0)
+        upper_bound = np.percentile(trace[varname], 97.5, axis=0)
+
+        try: #in case param is nd array
+            number_of_params = len(mean)
+            for idx in range(number_of_params):
+                print('-'*20)
+                print(f'the mean of beta_{idx} is {mean[idx][0]}')
+                print(f'the 95 percent credible interval for {varname}_{idx} is {lower_bound[idx][0], upper_bound[idx][0]}')
+        except:
+            #number_of_params = 1,  param is 1d array
+            print('-'*20)
+            print(f'the mean of {varname} is {mean}')
+            print(f'the 95 percent credible interval for {varname} is {lower_bound, upper_bound}')
 
 if __name__ == '__main__':
-    import pandas as pd
-    checkout_df = pd.read_csv('./data/check_out.csv', dtype={'SITENUMBER': str}, index_col=0)
-    from data_preprocessing_tools import transpose_dataframe
 
-    df_20_days = transpose_dataframe(checkout_df, start='2015-10-01',end='2015-10-30')
-    yy = df_20_days[[i for i in df_20_days.columns if i.startswith('DEV')]].values
-    xx = df_20_days[[i for i in df_20_days.columns if i.startswith('PRCP')]].values
-    locations = df_20_days.BASIN.values
+    import pandas as pd
+    from data_preprocessing_tools import transpose_dataframe
+    from utility_functions import get_in_between_dates
+
+    start ='2015-10-01'; end = '2015-10-30'
+    num_days = len(get_in_between_dates(start, end))
+    checkout_df = pd.read_csv('./data/check_out.csv', dtype={'SITENUMBER': str}, index_col=0)
+    df_sample = transpose_dataframe(checkout_df, start=start, end=end)
+
+    locations = df_sample.BASIN.values
+    yy = df_sample[[i for i in df_sample.columns if i.startswith('DEV')]].values
+    xx = df_sample[[i for i in df_sample.columns if i.startswith('PRCP')]].values
+    xx2 = df_sample[[i for i in df_sample.columns if i.startswith('ELEVATION')]].values
+    xx2 = np.tile(xx2, num_days)
+
+    covar = np.hstack([xx, xx2, np.multiply(xx2, xx)])
+    covar_with_interaction = np.hstack([xx, xx2, np.multiply(xx2, xx)])
 
     #example 1 (one covariate)
-    m1 = CarModel(covariates=xx,
-                 locations=locations,
-                response_var=yy)
-    m1.fit(fast_sampling=False, sample_size=5000)
+    if False:
+        m1 = CarModel(covariates=xx,
+                     locations=locations,
+                    response_var=yy)
+        m1.fit(fast_sampling=True, sample_size=5000)
+
+    #example 2 (two covariates)
+    if True:
+        m2 = CarModel(covariates=covar,
+                     locations=locations,
+                    response_var=yy)
+        m2.fit(fast_sampling=True, sample_size=5000)
