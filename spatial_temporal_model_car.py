@@ -104,21 +104,20 @@ class CarModel:
             beta_0 = beta_variables.pop(0)
             mu_ = self.intercepts*beta_0 + phi.T
             for idx, beta_ in enumerate(beta_variables):
-                mu_ = mu_ + beta_*self.covariates_split[idx]
+                mu_ += beta_*self.covariates_split[idx]
 
             # Mean model
             mu = pm.Deterministic('mu', mu_)
-            theta_sd  = pm.Gamma('theta_sd', alpha=1.0, beta=1.0)
+            theta_sd = pm.Gamma('theta_sd', alpha=1.0, beta=1.0)
             # Likelihood
             Yi = pm.Normal('Yi', mu=mu, tau=theta_sd, observed=self.response_var)
 
             if fast_sampling:
                 inference = pm.ADVI()
-                approx = pm.fit(n=25000, method=inference) #until converge
+                approx = pm.fit(n=25000, method=inference)
                 self.trace = approx.sample(draws=sample_size)
             else:
                 self.trace = pm.sample(sample_size, cores=2, tune=5000)
-
             for beta_name in beta_names:
                 self.report_credible_interval(self.trace, beta_name)
 
@@ -145,30 +144,48 @@ if __name__ == '__main__':
     from data_preprocessing_tools import transpose_dataframe
     from utility_functions import get_in_between_dates
 
-    start ='2015-10-01'; end = '2015-10-30'
+    start ='2014-01-01'; end = '2015-12-31'
     num_days = len(get_in_between_dates(start, end))
+
     checkout_df = pd.read_csv('./data/check_out.csv', dtype={'SITENUMBER': str}, index_col=0)
-    df_sample = transpose_dataframe(checkout_df, start=start, end=end)
+    df_sample_flat_wide = transpose_dataframe(checkout_df, start=start, end=end, time_varying_variables=['PRCP', 'DEV_GAGE_MAX', 'SPRING', 'SUMMER','FALL'])
 
-    locations = df_sample.BASIN.values
-    yy = df_sample[[i for i in df_sample.columns if i.startswith('DEV')]].values
-    xx = df_sample[[i for i in df_sample.columns if i.startswith('PRCP')]].values
-    xx2 = df_sample[[i for i in df_sample.columns if i.startswith('ELEVATION')]].values
-    xx2 = np.tile(xx2, num_days)
+    gage_level = df_sample_flat_wide[[i for i in df_sample_flat_wide.columns if i.startswith('DEV')]].values
+    rainfall = df_sample_flat_wide[[i for i in df_sample_flat_wide.columns if i.startswith('PRCP')]].values
+    elevations = df_sample_flat_wide[[i for i in df_sample_flat_wide.columns if i.startswith('ELEVATION')]].values
+    elevations = np.tile(elevations, num_days)
+    spring = df_sample_flat_wide[[i for i in df_sample_flat_wide.columns if i.startswith('SPRING')]].values
+    summer = df_sample_flat_wide[[i for i in df_sample_flat_wide.columns if i.startswith('SUMMER')]].values
+    fall = df_sample_flat_wide[[i for i in df_sample_flat_wide.columns if i.startswith('FALL')]].values
 
-    covar = np.hstack([xx, xx2, np.multiply(xx2, xx)])
-    covar_with_interaction = np.hstack([xx, xx2, np.multiply(xx2, xx)])
+    locations = df_sample_flat_wide.BASIN.values
+    covariate_m1 = rainfall
+    covariate_m2 = np.hstack([rainfall, elevations])
+    covariate_m3 = np.hstack([rainfall, elevations, spring, summer, fall])
+    covariate_m4 = np.hstack([rainfall, elevations, rainfall*elevations ])
 
-    #example 1 (one covariate)
     if False:
-        m1 = CarModel(covariates=xx,
+        m1 = CarModel(covariates=covariate_m1,
                      locations=locations,
-                    response_var=yy)
+                    response_var=gage_level)
         m1.fit(fast_sampling=True, sample_size=5000)
 
-    #example 2 (two covariates)
-    if True:
-        m2 = CarModel(covariates=covar,
+    if False:
+        m2 = CarModel(covariates=covariate_m2,
                      locations=locations,
-                    response_var=yy)
+                    response_var=gage_level)
         m2.fit(fast_sampling=True, sample_size=5000)
+
+    if True:
+        print('start fitting the third model')
+        m3 = CarModel(covariates=covariate_m3,
+                     locations=locations,
+                    response_var=gage_level)
+        m3.fit(fast_sampling=True, sample_size=5000)
+
+    if True:
+        print('start fitting the third model')
+        m4 = CarModel(covariates=covariate_m4,
+                     locations=locations,
+                    response_var=gage_level)
+        m4.fit(fast_sampling=True, sample_size=5000)
