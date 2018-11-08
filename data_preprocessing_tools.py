@@ -283,7 +283,17 @@ def get_basin_from_watershed(dataframe, watershed_col_name=None):
     print('-'*20)
     return dataframe
 
-def get_season_from_dates(dataframe, date_column=None):
+def get_season_from_dates(dataframe, date_column=None, add_binary_for_each_season=True):
+    '''
+    Add a season indicator to the original data frame
+    The added data frame will be called SEASON
+    Additionally, if add_binary_for_each_season is True, then four more columns will be added.
+
+    Args:
+     Dataframe (pandas dataframe): original dataframe with date time information
+     date_column (string): the name of the column that contains datetime information
+     add_binary_for_each_season (boolean): if true, four more columns will be added: SPRING, FALL, SUMMER and WINTER.
+    '''
     date_column = 'DATE' if date_column is None else date_column
     dates = dataframe[date_column].values.tolist()
 
@@ -291,16 +301,19 @@ def get_season_from_dates(dataframe, date_column=None):
     for date in dates:
         month = date.split('-')[1]
         if month in ['01', '02','12']:
-            seasons.append('winter')
+            seasons.append('WINTER')
         elif month in ['03', '04','05']:
-            seasons.append('spring')
+            seasons.append('SPRING')
         elif month in ['06', '07', '08']:
-            seasons.append('summer')
+            seasons.append('SUMMER')
         elif month in ['09', '10', '11']:
-            seasons.append('fall')
+            seasons.append('FALL')
         else:
             raise ValueError('the month is not readable')
     dataframe['SEASON'] = np.array(seasons)
+    if add_binary_for_each_season:
+        four_season = pd.get_dummies(np.array(seasons))
+        dataframe = pd.concat([dataframe, four_season], axis=1)
     return dataframe
 
 def transpose_dataframe(original_df,
@@ -310,7 +323,11 @@ def transpose_dataframe(original_df,
                    key='SITENUMBER',
                    fixed_variables = ['LATITUDE','LONGITUDE','ELEVATION', 'BASIN'],
                    time_varying_variables=['PRCP', 'DEV_GAGE_MAX']):
-
+    '''
+    Generate a flat-and-wide data frame based on a deep one.
+    In short, the original dataframe has a date column and a variable e.g. rainfall amount
+    the returned data frame will have a rainfall amount column for each day.
+    '''
     start = min(original_df[temporal_col]) if start is None else start
     end = max(original_df[temporal_col]) if end is None else end
 
