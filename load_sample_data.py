@@ -1,116 +1,105 @@
 import pandas as pd
-
-BASE_COLUMN_PRCP = ['STATION','LATITUDE','LONGITUDE','PRCP']
-BASE_COLUMN_FLOOD = ['SITENUMBER','LATITUDE','LONGITUDE','GAGE_MAX']
-
-def generate_information(dataframe, additional_variables, year, month, day=None):
+class SpatialDataLoader:
     '''
-    a bunch of print functions of give information of the dataframe
+    A base class for rainfall and flood dataloader. User should not call
+    this class directly. Use inherited class e.g. LoadFloodDaily instead
     '''
-    print('-'*20)
-    if day is None:
-        print(f'This is the data on {year}-{month}. (monthly)')
-    else:
-        print(f'This is the data on {year}-{month}-{day}. (daily)')
+    def __init__(self, dataframe, variables, year, month, day=None):
 
-    print(f"the additional variables include {', '.join(additional_variables)}")
-    print(f'This dataframe has {dataframe.shape[0]} rows, and {dataframe.shape[1]} columns')
-    print('This is raw data and thus there might be missing values')
-    print('-'*20)
+        self.date = self._make_date(year, month, day)
+        self.dataframe = dataframe
+        self.daily_data = self.dataframe[self.dataframe.DATE.str.startswith(self.date)][variables]
+        self.sanity_check(self.daily_data)
 
-def load_monthly_rainfall(additional_variables=None, year=2015, month=10):
-    '''
-    load a data frame of rainfall for a given month, Oct 2015 by default.
-    Some other information include latitude and longitude. Also sea surface temperature is provided.
-    '''
-    target_dir = './data/with_sst_1_year.csv'
-    additional_variables = ['ELEVATION', 'SST'] if additional_variables is None else additional_variables
+    def _make_date(self, year, month, day):
+        month = str(month).zfill(2)
+        year = str(year)
 
-    columns_selected = BASE_COLUMN_PRCP.copy()
-    columns_selected.extend(additional_variables)
+        if day is None:
+            date = '-'.join([year, month])
+        else:
+            day = str(day).zfill(2)
+            date = '-'.join([year, month, day])
+        return date
 
-    data_all = pd.read_csv(target_dir, index_col=0)
-    monthly_data = data_all[(data_all.YEAR==year)&(data_all.MONTH == month)][columns_selected
-    ]
-
-    if not monthly_data.empty:
-        generate_information(monthly_data, additional_variables, year, month, day=None)
-        return monthly_data.reset_index(drop=True)
-    else:
-        raise ValueError(f'No data found for {year}-{month}')
-
-def load_daily_rainfall(additional_variables=None, year=2015, month=10, day=3):
-    '''
-    load a data frame of rainfall for a given day, Oct 3 2015 by default.
-    Some other information include latitude and longitude. Also daily max and min temperature are provided.
-    However, TMAX and TMIN are more often than not missing.
-    '''
-    target_dir = './data/daily_rainfall_with_region_label.csv'
-    data_all = pd.read_csv(target_dir, index_col=0).reset_index(drop=True)
-
-    month = str(month).zfill(2)
-    day = str(day).zfill(2)
-    year = str(year)
-    date = '-'.join([year, month, day])
-
-    additional_variables = ['ELEVATION', 'TMAX', 'TMIN'] if additional_variables is None else additional_variables
-    columns_selected = BASE_COLUMN_PRCP.copy()
-    columns_selected.extend(additional_variables)
-    daily_data = data_all[data_all.DATE.str.startswith(date)][columns_selected]
-
-    if not daily_data.empty:
-        generate_information(daily_data, additional_variables, year, month, day)
-        return daily_data.reset_index(drop=True)
-    else:
-        raise ValueError(f'No data found for {year}-{month}-{day}')
-
-def load_monthly_flood(year=2015, month=10):
-    # try use the data from the checkout file
-
-    print('Rainfall information are given as well, as a covariate')
-    target_dir = './data/flood_data_1_year.csv'
-    columns_selected = BASE_COLUMN_FLOOD.copy()
-
-    data_all = pd.read_csv(target_dir, index_col=0, dtype={'SITENUMBER': str})
-    sample_data = data_all[(data_all.YEAR == year) & (data_all.MONTH == month)]
-    sample_data = sample_data[BASE_COLUMN_FLOOD].reset_index(drop = True)
-    return sample_data
-
-def load_daily_flood(year=2015, month=10, day=3, additional_variables=None):
-
-    month = str(month).zfill(2)
-    day = str(day).zfill(2)
-    year = str(year)
-    date = '-'.join([year, month, day])
-
-    target_dir = './data/check_out.csv'
-    data_all = pd.read_csv(target_dir, index_col=0, dtype={'SITENUMBER': str})
-
-    columns_selected = BASE_COLUMN_FLOOD.copy()
-    additional_variables = ['ELEVATION', 'BASIN', 'PRCP'] if additional_variables is None else additional_variables
-    columns_selected.extend(additional_variables)
-
-    daily_data = data_all[data_all.DATE.str.startswith(date)][columns_selected]
-    if not daily_data.empty:
-        generate_information(daily_data, additional_variables, year, month, day)
-        return daily_data.reset_index(drop=True)
-    else:
+    def print_message(self, custom_message):
         print('-'*20)
-        print(f'This is the rainfall data on {year}-{month}-{day} (daily maximum)')
-        print(f"the additional variables include {', '.join(additional_variables)}")
+        print('Finished loading...')
+        print(f'This is the data on {self.date} in pandas dataframe type')
+        print(custom_message)
+        print(f'This dataframe has {self.daily_data.shape[0]} rows, and {self.daily_data.shape[1]} columns')
         print('This is raw data and thus there might be missing values')
         print('-'*20)
-        raise  ValueError(f'No data found for {year}-{month}-{day}')
 
-def load_rainfall_multiple_days():
-    pass
+    def sanity_check(self, dataframe):
+        if dataframe.empty:
+            print('Cannot find data for the give criteria')
+            print('Please double check the date information you give')
+            print('Some function only works for 2015.')
+            raise ValueError(f'data not found for {self.date}')
 
-def load_flood_multiple_days():
-    pass
+    def load(self, custom_message):
+        self.print_message(custom_message)
+        return self.daily_data.reset_index(drop=True)
 
-# print(pd.read_csv('./data/daily_rainfall_with_region_label.csv')['DATE'])
-# print(load_daily_rainfall().head())
-print(load_monthly_rainfall().head())
+class LoadFloodByDay(SpatialDataLoader):
 
-print(load_daily_rainfall().head())
-print(load_daily_flood().head())
+    def __init__(self, year, month, day):
+        dataframe = pd.read_csv('./data/check_out.csv', index_col=0, dtype={'SITENUMBER':str})
+        variables = ['SITENUMBER','LATITUDE','LONGITUDE','GAGE_MAX', 'ELEVATION', 'PRCP','HISTORICAL_MEDIAN_GAGE_MAX']
+        super().__init__(dataframe, variables, year, month, day)
+
+    def load(self):
+        custom_message = 'Additional information include max and min temperature and rainfall.\n'
+        custom_message2 = 'HISTORICAL_MEDIAN_GAGE_MAX gives a historical reference line'
+        print('---- Start loading daily flood data ----')
+        return super().load(custom_message + custom_message2)
+
+class LoadRainByDay(SpatialDataLoader):
+
+    def __init__(self, year, month, day):
+        dataframe = pd.read_csv('./data/daily_rainfall_with_region_label.csv', index_col=0)
+        variables = ['STATION','LATITUDE','LONGITUDE','PRCP', 'ELEVATION', 'TMAX', 'TMIN']
+        super().__init__(dataframe, variables, year, month, day)
+
+    def load(self):
+        custom_message = 'Additional information include max and min temperature and elevation'
+        print('----  Start loading daily rainfall data ----')
+        return super().load(custom_message)
+
+class LoadRainByMonth(SpatialDataLoader):
+
+    def __init__(self, year, month, day=None):
+        dataframe = pd.read_csv('./data/with_sst_1_year.csv', index_col=0)
+        variables = ['STATION','LATITUDE','LONGITUDE','PRCP', 'ELEVATION', 'SST']
+        super().__init__(dataframe, variables, year, month, day)
+
+    def load(self):
+        custom_message = 'Additional information include elevation and sea surface temperature'
+        print('----  Start loading monthly (maximum) rainfall data ----')
+        return super().load(custom_message)
+
+class LoadFloodByMonth(SpatialDataLoader):
+
+    def __init__(self, year, month, day=None):
+        dir_ = './data/check_out_monthly.csv'
+        dataframe = pd.read_csv(dir_, index_col=0, dtype={'SITENUMBER': str})
+        variables = ['SITENUMBER','LATITUDE','LONGITUDE','GAGE_MAX', 'ELEVATION', 'PRCP','HISTORICAL_MEDIAN_GAGE_MAX']
+        super().__init__(dataframe, variables, year, month, day=None)
+
+    def load(self):
+        custom_message = 'Additional information include max and min temperature and rainfall.\n'
+        custom_message2 = 'HISTORICAL_MEDIAN_GAGE_MAX gives a historical reference line'
+        print('---- Start loading monthly (maximum) flood data ----')
+        return super().load(custom_message + custom_message2)
+
+if __name__ == '__main__':
+
+    s1 = LoadRainByDay(2015, 10, 3).load()
+    print(s1.head())
+    s2 = LoadFloodByDay(2015, 10, 3).load()
+    print(s2.head())
+    s3 = LoadRainByMonth(2015, 2).load()
+    print(s3.head())
+    s4 = LoadFloodByMonth(2015, 2).load()
+    print(s4.head())
