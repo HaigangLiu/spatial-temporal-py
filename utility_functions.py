@@ -49,8 +49,22 @@ def get_in_between_dates(start_date, end_date):
         start_date (string): Must follow 'xxxx-xx-xx' order: (year-month-day)
         end_date (string): Must follow 'xxxx-xx-xx' order: (year-month-day)
     '''
-    s_year, s_month, s_day = start_date.split('-') #s for start
-    e_year, e_month, e_day = end_date.split('-') #e for end
+
+    try:
+        s_year, s_month, s_day = start_date.split('-') #s for start
+        e_year, e_month, e_day = end_date.split('-') #e for end
+        only_get_month = False
+    except ValueError:
+        try:
+            start_date = '-'.join([start_date, '01'])
+            end_date = '-'.join([end_date, '01'])
+
+            s_year, s_month, s_day = start_date.split('-') #s for start
+            e_year, e_month, e_day = end_date.split('-') #e for end
+            only_get_month = True
+        except ValueError:
+            print('a format like yyyy-mm-dd or yyyy-mm-dd is required' )
+            return None
 
     start_date_formatted = date(int(s_year), int(s_month), int(s_day))
     end_date_formatted = date(int(e_year), int(e_month), int(e_day))
@@ -60,6 +74,11 @@ def get_in_between_dates(start_date, end_date):
     for i in range(delta.days + 1):
         date_ = str(start_date_formatted + timedelta(i))
         list_of_dates.append(date_)
+
+    if only_get_month:
+        months = [date[0:-3] for date in list_of_dates]
+        list_of_dates = sorted(list(set(months)))
+
     return list_of_dates
 
 def get_state_rectangle(state_name):
