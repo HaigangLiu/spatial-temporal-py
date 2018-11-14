@@ -2,6 +2,9 @@ import pymc3 as pm
 import numpy as np
 import theano.tensor as tt
 
+import theano
+theano.config.compute_test_value = "ignore" #no default value error shall occur without this line
+
 class CarModel:
     '''
     Fit a conditional autoregressive model (spatial-temporal model)
@@ -18,16 +21,17 @@ class CarModel:
         self.locations = locations
         self.N = self.response_var.shape[0] # N is number of locations
         self.number_of_days = response_var.shape[1]
-        self.covariates = covariates
+        self.covariates = theano.shared(covariates)
+        self.original_dim_cov = covariates.shape
 
         if self.number_of_days <= 1:
             raise ValueError('the data only contains info of one day. Use spatial module instead')
-        if self.covariates.shape[1]%self.number_of_days != 0:
+        if covariates.shape[1]%self.number_of_days != 0:
             example_1 = f'if y is {self.N}x{self.number_of_days}, '
             example_2 = f'then the second dim of x has to be a muliple of {self.number_of_days}'
             raise ValueError(example_1 + example_2)
         else:
-            self.dim = int(self.covariates.shape[1]/self.number_of_days)
+            self.dim = int(covariates.shape[1]/self.number_of_days)
         self.intercepts = np.ones((self.N, self.number_of_days))
 
         print('-'*20)
@@ -119,12 +123,70 @@ class CarModel:
             else:
                 self.trace = pm.sample(sample_size, cores=2, tune=5000)
             for beta_name in beta_names:
-                self.report_credible_interval(self.trace, beta_name)
+                self.report_credible_interval(varname=beta_name)
 
-    def report_credible_interval(self, trace, varname='beta'):
+    def predict_in_sample(self, sample_size=1000, use_median=False):
+
+        simulated_values = pm.sample_ppc(self.trace)['Yi']
+        if use_median: #might be pretty slow
+            self.y_predict_in_sample = np.median(simulated_values, axis=0)
+        else:
+            self.y_predict_in_sample = np.mean(simulated_values, axis=0)
+        self.residuals = self.response_var - self.y_predict_in_sample
+
+        #report mse and mae
+        l1_loss = np.mean(np.abs(self.response_var - self.y_predict_in_sample))
+        l2_loss = np.mean(np.square(self.response_var - self.y_predict_in_sample))
+        print(f'The MAE of this model based on in-sample predictions is {l1_loss}')
+        print(f'The MSE of this model based on in-sample predictions is {l2_loss}')
+
+
+    def predict_new_data(self, new_x, days, sample_size=1000):
+
+        if days < self.number_of_days:
+
+            print('automatically padding the input to match dim of original covariates.')
+
+            where_to_slice = [days*i for i in range(self.dim)]
+            where_to_slice.pop(0)
+            x_new_split = np.hsplit(new_x, where_to_slice)
+
+            x_new_list_ = []
+            for partial_data in x_new_split: #padding is required for all
+                extra_days = self.number_of_days - days
+                padded_values = np.random.standard_normal(self.N*d2).reshape(self.N, extra_days)
+                new_x_i = np.hstack([partial_data, padded_values])
+                x_new_list_.append(new_x_i)
+
+            new_x = np.hstack(x_new_list_)
+            new_x = np.hstack([new_x, self.intercepts])
+            self.covariates.set_value(new_x)
+
+        elif days == self.number_of_days:
+            pass
+        else:
+            print('the days to predict is greater than the original dates. ')
+            print('this use case is not supported.')
+            return None
+
+        simulated_values = pm.sample_ppc(self.trace)['Yi']
+        self.y_predict_out_of_sample = np.mean(simulated_values, axis=0)
+
+
+    def get_residual_by_location(self):
+        pass
+
+
+
+    def report_credible_interval(self, sig_level=0.95, varname='beta',  trace=None):
+
+        trace = self.trace if trace is None else trace #default trace
         mean = trace[varname].mean(axis=0)
-        lower_bound = np.percentile(trace[varname], 2.5, axis=0)
-        upper_bound = np.percentile(trace[varname], 97.5, axis=0)
+
+        lower_threshold = (100 - sig_level*100)/2
+        upper_threshold = 100 - lower_threshold
+        lower_bound = np.percentile(trace[varname], lower_threshold, axis=0)
+        upper_bound = np.percentile(trace[varname], upper_threshold, axis=0)
 
         try: #in case param is nd array
             number_of_params = len(mean)
@@ -164,26 +226,32 @@ if __name__ == '__main__':
     covariate_m3 = np.hstack([rainfall, elevations, spring, summer, fall])
     covariate_m4 = np.hstack([rainfall, elevations, rainfall*elevations ])
 
+    covariates_m2_new = np.hstack([rainfall[:,3], rainfall[:,3]])
+
+
     if False:
         m1 = CarModel(covariates=covariate_m1,
                      locations=locations,
                     response_var=gage_level)
-        m1.fit(fast_sampling=True, sample_size=5000)
+        m1.fit(fast_sampling=True, sample_size=200)
+        m1.predict_in_sample()
 
-    if False:
+    if True:
         m2 = CarModel(covariates=covariate_m2,
                      locations=locations,
                     response_var=gage_level)
         m2.fit(fast_sampling=True, sample_size=5000)
+        m2.predict_in_sample()
+        m2.predict_new_data(covariates_m2_new)
 
-    if True:
+    if False:
         print('start fitting the third model')
         m3 = CarModel(covariates=covariate_m3,
                      locations=locations,
                     response_var=gage_level)
-        m3.fit(fast_sampling=True, sample_size=5000)
+        m3.fit(fast_sampling=False, sample_size=5000)
 
-    if True:
+    if False:
         print('start fitting the third model')
         m4 = CarModel(covariates=covariate_m4,
                      locations=locations,
