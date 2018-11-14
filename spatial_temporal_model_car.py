@@ -4,6 +4,7 @@ import theano.tensor as tt
 
 import theano
 theano.config.compute_test_value = "ignore" #no default value error shall occur without this line
+FAST_SAMPLE_ITERATION = 50000 #advi setting
 
 class CarModel:
     '''
@@ -43,6 +44,9 @@ class CarModel:
         self.weight_matrix = None
         self.adjacent_matrix = None
         self._get_weight_matrices()
+
+        self.l1_loss = None
+        self.l2_loss = None
 
     def _get_weight_matrices(self):
 
@@ -118,16 +122,49 @@ class CarModel:
 
             if fast_sampling:
                 inference = pm.ADVI()
-                approx = pm.fit(n=25000, method=inference)
+                approx = pm.fit(n=FAST_SAMPLE_ITERATION, method=inference)
                 self.trace = approx.sample(draws=sample_size)
             else:
                 self.trace = pm.sample(sample_size, cores=2, tune=5000)
             for beta_name in beta_names:
                 self.report_credible_interval(varname=beta_name)
 
+    def get_metrics(self):
+        '''
+        generate a few metrics for model comparison
+        '''
+        print('-'*20)
+        print('this is a summary of model metrics')
+        if self.l1_loss is None:
+            self.predict()
+        print(f'The model mae is {self.l1_loss}')
+
+        if self.l2_loss is None:
+            self.predict()
+        print(f'The model mse is {self.l2_loss}')
+
+        self.result_waic = pm.waic(self.trace, self.model)
+        self.result_leave_one_out = pm.loo(self.trace, self.model)
+        print(f'the model waic is given by {self.result_waic}')
+        print(f'the model leave-one-out accuracy is given by {self.result_leave_one_out}')
+        print('all these  can be accessed as attributes by class-dot')
+        print('-'*20)
+
+    def predict(self, new_data=None, sample_size=1000, use_median=False):
+        '''if there is no new data given, assume in-sample prediction. otherwise do it for new_x'''
+        if new_data is None:
+            print('no new data are given. In-sample predictions are made')
+            self.predict_in_sample(sample_size=sample_size, use_median=use_median)
+            return self.y_predict_in_sample
+        else:
+            print('predictions are made based on given new data')
+            self.predict_new_data(new_x=new_data, sample_size=sample_size, use_median=use_median)
+            return self.y_predict_out_of_sample
+
     def predict_in_sample(self, sample_size=1000, use_median=False):
 
-        simulated_values = pm.sample_ppc(self.trace)['Yi']
+        with self.model:
+            simulated_values = pm.sample_ppc(self.trace)['Yi']
         if use_median: #might be pretty slow
             self.y_predict_in_sample = np.median(simulated_values, axis=0)
         else:
@@ -135,17 +172,28 @@ class CarModel:
         self.residuals = self.response_var - self.y_predict_in_sample
 
         #report mse and mae
-        l1_loss = np.mean(np.abs(self.response_var - self.y_predict_in_sample))
-        l2_loss = np.mean(np.square(self.response_var - self.y_predict_in_sample))
-        print(f'The MAE of this model based on in-sample predictions is {l1_loss}')
-        print(f'The MSE of this model based on in-sample predictions is {l2_loss}')
+        self.l1_loss = np.mean(np.abs(self.response_var - self.y_predict_in_sample))
+        self.l2_loss = np.mean(np.square(self.response_var - self.y_predict_in_sample))
+        print(f'The MAE of this model based on in-sample predictions is {self.l1_loss }')
+        print(f'The MSE of this model based on in-sample predictions is {self.l2_loss}')
 
 
-    def predict_new_data(self, new_x, days, sample_size=1000):
+    def predict_new_data(self, new_x, sample_size=1000,  use_median=False):
+
+        try:
+            days = int(new_x.shape[1]/self.dim)
+        except IndexError: #just 1d this case
+            new_x = new_x[:, None]
+
+        if new_x.shape[1]%self.dim !=0:
+            print(f'the new data has {new_x.shape[1]} columns')
+            print(f'and there is {self.dim} variable')
+            print(f'trying to imply the number of days involved but {new_x.shape[1]} over {self.dim} is not an int')
+            raise ValueError('dimension mismatch: check the input dimension again')
 
         if days < self.number_of_days:
-
             print('automatically padding the input to match dim of original covariates.')
+            print('this is due to a design choice of pymc3; in general this should not concern user')
 
             where_to_slice = [days*i for i in range(self.dim)]
             where_to_slice.pop(0)
@@ -154,29 +202,28 @@ class CarModel:
             x_new_list_ = []
             for partial_data in x_new_split: #padding is required for all
                 extra_days = self.number_of_days - days
-                padded_values = np.random.standard_normal(self.N*d2).reshape(self.N, extra_days)
+                padded_values = np.random.standard_normal(self.N*extra_days).reshape(self.N, extra_days)
                 new_x_i = np.hstack([partial_data, padded_values])
                 x_new_list_.append(new_x_i)
 
-            new_x = np.hstack(x_new_list_)
-            new_x = np.hstack([new_x, self.intercepts])
+            new_x = np.hstack(x_new_list_) # dont need intercept
             self.covariates.set_value(new_x)
 
         elif days == self.number_of_days:
             pass
+
         else:
             print('the days to predict is greater than the original dates. ')
             print('this use case is not supported.')
             return None
 
-        simulated_values = pm.sample_ppc(self.trace)['Yi']
+        with self.model:
+            simulated_values = pm.sample_ppc(self.trace)['Yi']
         self.y_predict_out_of_sample = np.mean(simulated_values, axis=0)
+        self.y_predict_out_of_sample = self.y_predict_out_of_sample[:, 0:days] #only first few column are relevant
 
-
-    def get_residual_by_location(self):
-        pass
-
-
+    # def get_residual_by_location(self):
+    #     pass
 
     def report_credible_interval(self, sig_level=0.95, varname='beta',  trace=None):
 
@@ -226,8 +273,7 @@ if __name__ == '__main__':
     covariate_m3 = np.hstack([rainfall, elevations, spring, summer, fall])
     covariate_m4 = np.hstack([rainfall, elevations, rainfall*elevations ])
 
-    covariates_m2_new = np.hstack([rainfall[:,3], rainfall[:,3]])
-
+    covariates_m2_new = np.hstack([rainfall[:,3:5], elevations[:,3:5]])
 
     if False:
         m1 = CarModel(covariates=covariate_m1,
@@ -240,9 +286,9 @@ if __name__ == '__main__':
         m2 = CarModel(covariates=covariate_m2,
                      locations=locations,
                     response_var=gage_level)
-        m2.fit(fast_sampling=True, sample_size=5000)
-        m2.predict_in_sample()
-        m2.predict_new_data(covariates_m2_new)
+        m2.fit(fast_sampling=False, sample_size=1000)
+        m2.predict(covariates_m2_new)
+        m2.get_metrics()
 
     if False:
         print('start fitting the third model')
