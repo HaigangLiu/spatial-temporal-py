@@ -354,6 +354,20 @@ def transpose_dataframe(original_df,
     dataframe = summary_form.merge(output_df, left_on=key, right_on=key, how='inner')
     return dataframe
 
+def mark_flood_season(original_df, start, end, time_col='DATE'):
+    '''
+    add a dummy variable for flood season. This is because the rainfall and flood dynamics might be different on normal days vs. flood seasons.
+    '''
+    flood_season_dates = get_in_between_dates(start, end)
+    indicators = []
+    for date_ in original_df[time_col].isin(list_of_dates):
+        if date_:
+            booleans.append(1)
+        else:
+            booleans.append(0)
+    original_df['FLOOD_SEASON'] = np.array(indicators)
+    return original_df
+
 if __name__ == '__main__':
 
     # raw_df = pd.read_csv('./data/rainfall_and_flood_10_beta.csv', index_col=0, dtype={'SITENUMBER': str})
