@@ -356,7 +356,8 @@ def transpose_dataframe(original_df,
 
 def mark_flood_season(original_df, start, end, time_col='DATE'):
     '''
-    add a dummy variable for flood season. This is because the rainfall and flood dynamics might be different on normal days vs. flood seasons.
+    add a dummy variable for flood season.
+    This is because the rainfall and flood dynamics might be different on normal days vs. flood seasons.
     '''
     flood_season_dates = get_in_between_dates(start, end)
     indicators = []
