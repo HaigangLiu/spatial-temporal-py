@@ -9,7 +9,7 @@ from PIL import Image
 from statsmodels.tsa.stattools import acf, pacf
 
 theano.config.compute_test_value = "ignore" #no default value error shall occur without this line
-FAST_SAMPLE_ITERATION = 30 #advi setting
+FAST_SAMPLE_ITERATION = 50 #advi setting
 
 class CarModel:
     '''
@@ -91,9 +91,9 @@ class CarModel:
         self.weight_matrix = wmat2
         self.D = np.diag(self.weight_matrix.sum(axis=1))
 
-    def fit(self, fast_sampling=True, sample_size=3000):
+    def fit(self, fast_sampling=True, sample_size=3000, sig=0.95):
 
-        self.fitted_parameters = []
+        fitted_parameters = []
         if self.dim > 1:
             where_to_slice = [self.number_of_days*i for i in range(self.dim)]
             where_to_slice.pop(0)
@@ -136,30 +136,49 @@ class CarModel:
             else:
                 self.trace = pm.sample(sample_size, cores=2, tune=5000)
             for beta_name in beta_names:
-                self.fitted_parameters.append(self.get_interval(varname=beta_name))
-            #report
-            self.pretty_print(self.fitted_parameters)
+                fitted_parameters.append(self.get_interval(sig_level=sig, varname=beta_name))
+
+            tau = self.get_interval(sig_level=sig, varname='tau')
+            fitted_parameters.append(tau)
+
+            alpha = self.get_interval(sig_level=sig, varname='alpha')
+            fitted_parameters.append(alpha)
+
+        #report
+        threshold_str_l = str(self.lower_threshold)
+        threshold_str_u = str(self.upper_threshold)
+        model_fitting_report = [['variable', 'point estimate', threshold_str_l,threshold_str_u, 'significant']]
+        model_fitting_report.extend(fitted_parameters)
+
+        header = 'Model Fitting Report'
+        self.pretty_print(header, model_fitting_report)
 
     def get_metrics(self):
         '''
         generate a few metrics for model comparison
         '''
-        print('-'*20)
-        print('this is a summary of model metrics')
         if self.l1_loss is None:
             self.predict()
-        print(f'The model mae is {self.l1_loss}')
 
         if self.l2_loss is None:
             self.predict()
-        print(f'The model mse is {self.l2_loss}')
 
         self.result_waic = pm.waic(self.trace, self.model)
         self.result_leave_one_out = pm.loo(self.trace, self.model)
-        print(f'the model waic is given by {self.result_waic}')
-        print(f'the model leave-one-out accuracy is given by {self.result_leave_one_out}')
-        print('all these  can be accessed as attributes by class-dot')
-        print('-'*20)
+
+        loo = self.result_leave_one_out.LOO
+        waic = self.result_waic.WAIC
+
+        table = [['metric', 'value']]
+        metrics = []
+        metrics.append(['mse', str(round(self.l2_loss, 4))])
+        metrics.append(['mae', str(round(self.l1_loss, 4))])
+        metrics.append(['loo',str(round(loo, 4))])
+        metrics.append(['aic', str(round(waic, 4))])
+        table.extend(metrics)
+
+        header = 'Model Fitting Metrics Report'
+        self.pretty_print(header, table, table_len=50)
 
     def get_residual_by_region(self):
         '''
@@ -189,18 +208,18 @@ class CarModel:
         if mode == 'time series':
             fig = residual_by_region.T.plot(figsize=[figsize_baseline,figsize_baseline], alpha=0.7)
             fig  = fig.get_figure()
-            figname = figname + '_tsplot_for_resid.png' if figname is None else 'tsplot_for_resid.png'
-            fig.savefig(figname)
+            figname_ = '_'.join([figname,'tsplot_for_resid.png']) if figname else 'tsplot_for_resid.png'
+            fig.savefig(figname_)
 
         elif mode == 'histogram':
             fig = residual_by_region.T.hist(figsize=[figsize_baseline,figsize_baseline], alpha=0.7)
-            figname = figname + '_histogram_for_resid.png' if figname is None else 'histogram_for_resid.png'
-            plt.savefig(figname) #save the most recent
+            figname_ = '_'.join([figname,  '_histogram_for_resid.png']) if figname else 'histogram_for_resid.png'
+            plt.savefig(figname_) #save the most recent
 
         else:
             raise ValueError("only allow two modes: 'time series' or 'histogram'." )
 
-        full_dir  = os.path.join(os.getcwd(), figname)
+        full_dir  = os.path.join(os.getcwd(), figname_)
         print(f'the image file has been saved to {full_dir}')
         f = Image.open(full_dir).show()
 
@@ -224,37 +243,12 @@ class CarModel:
 
             figname_base = 'acf.png' if type_=='acf' else 'pacf.png'
             complete_name = '_'.join([figname, figname_base]) if  figname else figname_base
-            full_dir = os.path.join([os.getcwd(), complete_name])
+            full_dir = os.path.join(os.getcwd(), complete_name)
             canvass.savefig(full_dir)
             f = Image.open(full_dir).show()
 
         _plot(figname, type_='acf')
         _plot(figname, type_='pacf')
-
-        # fig_pacf = plt.figure()
-        # for idx, loc in enumerate(locs):
-        #     plt.subplot(len(locs),1,idx + 1)
-        #     pd.Series(pacf(residual_by_region.T[loc])).plot(kind='bar', color='lightblue')
-        #     plt.text(0.8,0.5, s=loc, horizontalalignment='left')
-
-        # name_pacf = figname + '_pacf.png' if figname else 'pacf.png'
-        # dir_pacf = os.path.join(os.getcwd(), name_pacf)
-        # fig_pacf.savefig(dir_pacf)
-        # print(f'the image file has been saved to {dir_pacf}')
-
-        # fig_acf = plt.figure(figsize=[fig_size, len(locs)*2.5])
-        # for idx, loc in enumerate(locs):
-        #     plt.subplot(len(locs),1,idx + 1)
-        #     pd.Series(acf(residual_by_region.T[loc])).plot(kind='bar', color='lightblue')
-        #     plt.text(0.8,0.5, s=loc, horizontalalignment='left')
-
-        # name_acf = figname + '_acf.png' if figname else 'acf.png'
-        # dir_acf = os.path.join(os.getcwd(), name_acf)
-        # fig_acf.savefig(dir_acf)
-        # print(f'the image file has been saved to {dir_acf}')
-
-        # f1 = Image.open(dir_acf).show()
-        # f2 = Image.open(dir_pacf).show()
 
     def predict(self, new_data=None, sample_size=1000, use_median=False):
         '''if there is no new data given, assume in-sample prediction. otherwise do it for new_x'''
@@ -327,7 +321,7 @@ class CarModel:
         self.y_predicted_out_of_sample = np.mean(simulated_values, axis=0)
         self.y_predicted_out_of_sample = self.y_predicted_out_of_sample[:, 0:days] #only first few column are relevant
 
-    def get_interval(self, sig_level=0.95, varname='beta',  trace=None):
+    def get_interval(self, sig_level, varname='beta',  trace=None):
 
         trace = self.trace if trace is None else trace #default trace
         mean = trace[varname].mean(axis=0)
@@ -342,34 +336,27 @@ class CarModel:
             conclusion = '***'
         else:
             conclusion = ' '
-        # try: #in case param is nd array
-        #     fitted_result = []
-        #     number_of_params = len(mean)
-        #     for idx in range(number_of_params):
-        #         fitted_result.append([varname+'_'+str(idx), str(mean[idx][0]), str(lower_bound[idx][0]), str(upper_bound[idx][0])])
-        #     return fitted_result
 
-        # except:
-        #number_of_params = 1,  param is 1d array
         mean = str(round(mean, 4))
         lower_bound = str(round(lower_bound, 4))
         upper_bound = str(round(upper_bound, 4))
         return [varname, mean, lower_bound, upper_bound, conclusion]
 
-    def pretty_print(self, list_of_result):
-        threshold_str_l = str(self.lower_threshold)
-        threshold_str_u = str(self.upper_threshold)
+    def pretty_print(self, header, table_to_print, table_len=80):
 
-        model_fitting_report = [['variable', 'point estimate', threshold_str_l,threshold_str_u, 'significant']]
-        model_fitting_report.extend(list_of_result)
+        # threshold_str_l = str(self.lower_threshold)
+        # threshold_str_u = str(self.upper_threshold)
 
-        print('-'*80)
-        print('Model Fit Summary')
-        col_width = max(len(word) for row in model_fitting_report for word in row) + 2  # padding
-        for row in model_fitting_report:
+        # model_fitting_report = [['variable', 'point estimate', threshold_str_l,threshold_str_u, 'significant']]
+        # model_fitting_report.extend(list_of_result)
+
+        print('-'*table_len)
+        print(header)
+        col_width = max(len(word) for row in table_to_print for word in row) + 2  # padding
+        for row in table_to_print:
             print('-'*80)
             print("".join(word.ljust(col_width) for word in row))
-        print('-'*80)
+        print('-'*table_len)
 
 if __name__ == '__main__':
 
@@ -401,7 +388,6 @@ if __name__ == '__main__':
     covariate_m3 = np.hstack([rainfall, elevations, spring, summer, fall])
     covariate_m4 = np.hstack([rainfall, elevations, rainfall*elevations, spring, summer, fall])
     covariate_m5 = np.hstack([rainfall, flood_season_indicator,flood_season_indicator*rainfall, elevations])
-    covariates_m2_new = np.hstack([rainfall[:,3:5], elevations[:,3:5]])
 
     if False:
         m1 = CarModel(covariates=covariate_m1,
@@ -433,7 +419,7 @@ if __name__ == '__main__':
                     response_var=gage_level)
         m4.fit(fast_sampling=True, sample_size=5000)
         # m4.predict()
-        # m4.get_metrics()
+        m4.get_metrics()
         # m4.get_residual_by_region()
-        m4.get_acf_and_pacf_by_region('garbage')
-        m4.get_residual_plots_by_region('garbage')
+        m4.get_acf_and_pacf_by_region(figname='garbage')
+        m4.get_residual_plots_by_region(figname='garbage')
