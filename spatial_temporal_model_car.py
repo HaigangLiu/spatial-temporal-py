@@ -136,12 +136,12 @@ class CarModel:
             else:
                 self.trace = pm.sample(sample_size, cores=2, tune=5000)
             for beta_name in beta_names:
-                fitted_parameters.append(self.get_interval(sig_level=sig, varname=beta_name))
+                fitted_parameters.append(self.get_parameter_estimation(sig_level=sig, varname=beta_name))
 
-            tau = self.get_interval(sig_level=sig, varname='tau')
+            tau = self.get_parameter_estimation(sig_level=sig, varname='tau')
             fitted_parameters.append(tau)
 
-            alpha = self.get_interval(sig_level=sig, varname='alpha')
+            alpha = self.get_parameter_estimation(sig_level=sig, varname='alpha')
             fitted_parameters.append(alpha)
 
         #report
@@ -151,7 +151,7 @@ class CarModel:
         model_fitting_report.extend(fitted_parameters)
 
         header = 'Model Fitting Report'
-        self.pretty_print(header, model_fitting_report)
+        self._pretty_print(header, model_fitting_report)
 
     def get_metrics(self):
         '''
@@ -178,7 +178,7 @@ class CarModel:
         table.extend(metrics)
 
         header = 'Model Fitting Metrics Report'
-        self.pretty_print(header, table, table_len=50)
+        self._pretty_print(header, table, table_len=50)
 
     def get_residual_by_region(self):
         '''
@@ -307,10 +307,8 @@ class CarModel:
 
             new_x = np.hstack(x_new_list_) # dont need intercept
             self.covariates.set_value(new_x)
-
         elif days == self.number_of_days:
             pass
-
         else:
             print('the days to predict is greater than the original dates. ')
             print('this use case is not supported.')
@@ -321,7 +319,7 @@ class CarModel:
         self.y_predicted_out_of_sample = np.mean(simulated_values, axis=0)
         self.y_predicted_out_of_sample = self.y_predicted_out_of_sample[:, 0:days] #only first few column are relevant
 
-    def get_interval(self, sig_level, varname='beta',  trace=None):
+    def get_parameter_estimation(self, sig_level, varname, trace=None):
 
         trace = self.trace if trace is None else trace #default trace
         mean = trace[varname].mean(axis=0)
@@ -342,19 +340,15 @@ class CarModel:
         upper_bound = str(round(upper_bound, 4))
         return [varname, mean, lower_bound, upper_bound, conclusion]
 
-    def pretty_print(self, header, table_to_print, table_len=80):
-
-        # threshold_str_l = str(self.lower_threshold)
-        # threshold_str_u = str(self.upper_threshold)
-
-        # model_fitting_report = [['variable', 'point estimate', threshold_str_l,threshold_str_u, 'significant']]
-        # model_fitting_report.extend(list_of_result)
-
+    def _pretty_print(self, header, table_to_print, table_len=80):
+        '''
+        generate a better-looking table to organize information.
+        '''
         print('-'*table_len)
         print(header)
         col_width = max(len(word) for row in table_to_print for word in row) + 2  # padding
         for row in table_to_print:
-            print('-'*80)
+            print('-'*table_len)
             print("".join(word.ljust(col_width) for word in row))
         print('-'*table_len)
 
