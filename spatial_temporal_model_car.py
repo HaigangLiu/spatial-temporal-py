@@ -1,8 +1,13 @@
+import os
+import theano
 import pymc3 as pm
 import numpy as np
+import pandas as pd
 import theano.tensor as tt
+import matplotlib.pyplot as plt
+from PIL import Image
+from statsmodels.tsa.stattools import acf, pacf
 
-import theano
 theano.config.compute_test_value = "ignore" #no default value error shall occur without this line
 FAST_SAMPLE_ITERATION = 50000 #advi setting
 
@@ -48,6 +53,9 @@ class CarModel:
         self.l1_loss = None
         self.l2_loss = None
 
+        self.residuals = None
+        self.residual_by_region = None #average over stations in that region; time series data
+
     def _get_weight_matrices(self):
 
         try:
@@ -85,6 +93,7 @@ class CarModel:
 
     def fit(self, fast_sampling=True, sample_size=3000):
 
+        self.fitted_parameters = []
         if self.dim > 1:
             where_to_slice = [self.number_of_days*i for i in range(self.dim)]
             where_to_slice.pop(0)
@@ -127,7 +136,9 @@ class CarModel:
             else:
                 self.trace = pm.sample(sample_size, cores=2, tune=5000)
             for beta_name in beta_names:
-                self.report_credible_interval(varname=beta_name)
+                self.fitted_parameters.append(self.get_interval(varname=beta_name))
+            #report
+            self.pretty_print(self.fitted_parameters)
 
     def get_metrics(self):
         '''
@@ -150,35 +161,110 @@ class CarModel:
         print('all these  can be accessed as attributes by class-dot')
         print('-'*20)
 
+    def get_residual_by_region(self):
+        '''
+        get residuals for each region.
+        For one regions, there is usually multiple locations and multiple days,
+        we average over different locations and thus got time series data for each big region.
+        '''
+        if self.residuals is None:
+            self._predict_in_sample()
+
+        resid_df = pd.DataFrame(self.residuals)
+        resid_df['watershed'] = self.locations
+        self.residual_by_region = resid_df.groupby('watershed').mean()
+
+    def get_residual_plots_by_region(self, filename=None, mode='time series'):
+        '''
+        provide either time series plot or histogram for residuals; split by different region.
+        For each region, we find the mean of every time point
+        if there are muliple observations for that regions and that day.
+        '''
+        if self.residual_by_region is None:
+            self.get_residual_by_region()
+
+        residual_by_region = self.residual_by_region
+
+        if mode == 'time series':
+            fig = residual_by_region.T.plot(figsize=[10,10], alpha=0.7)
+        elif mode == 'histogram':
+            fig = residual_by_region.T.hist(figsize=[10,10], alpha=0.7)
+        else:
+            raise ValueError("only allow two modes: 'time series' or 'histogram'." )
+
+        fig  = fig.get_figure()
+
+        if filename is None:
+            if mode == 'time series':
+                filename = 'tsplot_for_resid.png'
+            else:
+                filename = 'histogram_for_resid.png'
+        full_dir  = os.path.join(os.getcwd(), filename)
+        fig.savefig(full_dir)
+        print(f'the image file has been saved to {full_dir}')
+
+        f = Image.open(full_dir).show()
+
+    def get_acf_and_pacf_by_region(self, filename=None, fig_size=15):
+
+        if self.residual_by_region is None:
+            self.get_residual_by_region()
+
+        residual_by_region = self.residual_by_region
+        locs = list(set(self.locations))
+
+        fig_pacf = plt.figure(figsize=[fig_size, len(locs)*2.5])
+        for idx, loc in enumerate(locs):
+            plt.subplot(len(locs),1,idx + 1)
+            pd.Series(pacf(residual_by_region.T[loc])).plot(kind='bar', color='lightblue')
+            plt.text(0.8,0.5, s = loc, horizontalalignment='left')
+        name_pacf = filename + '_pacf.png' if filename else 'pacf.png'
+        dir_pacf = os.path.join(os.getcwd(), name_pacf)
+        fig_pacf.savefig(dir_pacf)
+        print(f'the image file has been saved to {dir_pacf}')
+
+        fig_acf = plt.figure(figsize=[15, len(locs)*2.5])
+        for idx, loc in enumerate(locs):
+            plt.subplot(len(locs),1,idx + 1)
+            pd.Series(acf(residual_by_region.T[loc])).plot(kind='bar', color='lightblue')
+            plt.text(0.8,0.5, s = loc, horizontalalignment='left')
+
+        name_acf = filename + '_acf.png' if filename else 'acf.png'
+        dir_acf = os.path.join(os.getcwd(), name_acf)
+        fig_acf.savefig(dir_acf)
+        print(f'the image file has been saved to {dir_acf}')
+
+        f1 = Image.open(dir_acf).show()
+        f2 = Image.open(dir_pacf).show()
+
     def predict(self, new_data=None, sample_size=1000, use_median=False):
         '''if there is no new data given, assume in-sample prediction. otherwise do it for new_x'''
         if new_data is None:
             print('no new data are given. In-sample predictions are made')
-            self.predict_in_sample(sample_size=sample_size, use_median=use_median)
-            return self.y_predict_in_sample
+            self._predict_in_sample(sample_size=sample_size, use_median=use_median)
+            return self.y_predicted_in_sample
         else:
             print('predictions are made based on given new data')
-            self.predict_new_data(new_x=new_data, sample_size=sample_size, use_median=use_median)
-            return self.y_predict_out_of_sample
+            self._predict_out_of_sample(new_x=new_data, sample_size=sample_size, use_median=use_median)
+            return self.y_predicted_out_of_sample
 
-    def predict_in_sample(self, sample_size=1000, use_median=False):
+    def _predict_in_sample(self, sample_size=1000, use_median=False):
 
         with self.model:
             simulated_values = pm.sample_ppc(self.trace)['Yi']
         if use_median: #might be pretty slow
-            self.y_predict_in_sample = np.median(simulated_values, axis=0)
+            self.y_predicted_in_sample = np.median(simulated_values, axis=0)
         else:
-            self.y_predict_in_sample = np.mean(simulated_values, axis=0)
-        self.residuals = self.response_var - self.y_predict_in_sample
+            self.y_predicted_in_sample = np.mean(simulated_values, axis=0)
+        self.residuals = self.response_var - self.y_predicted_in_sample
 
         #report mse and mae
-        self.l1_loss = np.mean(np.abs(self.response_var - self.y_predict_in_sample))
-        self.l2_loss = np.mean(np.square(self.response_var - self.y_predict_in_sample))
+        self.l1_loss = np.mean(np.abs(self.response_var - self.y_predicted_in_sample))
+        self.l2_loss = np.mean(np.square(self.response_var - self.y_predicted_in_sample))
         print(f'The MAE of this model based on in-sample predictions is {self.l1_loss }')
         print(f'The MSE of this model based on in-sample predictions is {self.l2_loss}')
 
-
-    def predict_new_data(self, new_x, sample_size=1000,  use_median=False):
+    def _predict_out_of_sample(self, new_x, sample_size=1000,  use_median=False):
 
         try:
             days = int(new_x.shape[1]/self.dim)
@@ -219,50 +305,71 @@ class CarModel:
 
         with self.model:
             simulated_values = pm.sample_ppc(self.trace)['Yi']
-        self.y_predict_out_of_sample = np.mean(simulated_values, axis=0)
-        self.y_predict_out_of_sample = self.y_predict_out_of_sample[:, 0:days] #only first few column are relevant
+        self.y_predicted_out_of_sample = np.mean(simulated_values, axis=0)
+        self.y_predicted_out_of_sample = self.y_predicted_out_of_sample[:, 0:days] #only first few column are relevant
 
-    # def get_residual_by_location(self):
-    #     pass
-
-    def report_credible_interval(self, sig_level=0.95, varname='beta',  trace=None):
+    def get_interval(self, sig_level=0.95, varname='beta',  trace=None):
 
         trace = self.trace if trace is None else trace #default trace
         mean = trace[varname].mean(axis=0)
 
-        lower_threshold = (100 - sig_level*100)/2
-        upper_threshold = 100 - lower_threshold
-        lower_bound = np.percentile(trace[varname], lower_threshold, axis=0)
-        upper_bound = np.percentile(trace[varname], upper_threshold, axis=0)
+        self.lower_threshold = (100 - sig_level*100)/2
+        self.upper_threshold = 100 - self.lower_threshold
+        lower_bound = np.percentile(trace[varname], self.lower_threshold, axis=0)
+        upper_bound = np.percentile(trace[varname], self.upper_threshold, axis=0)
+        if upper_bound >= 0 and lower_bound >= 0:
+            conclusion = '***'
+        else:
+            conclusion = ' '
+        # try: #in case param is nd array
+        #     fitted_result = []
+        #     number_of_params = len(mean)
+        #     for idx in range(number_of_params):
+        #         fitted_result.append([varname+'_'+str(idx), str(mean[idx][0]), str(lower_bound[idx][0]), str(upper_bound[idx][0])])
+        #     return fitted_result
 
-        try: #in case param is nd array
-            number_of_params = len(mean)
-            for idx in range(number_of_params):
-                print('-'*20)
-                print(f'the mean of beta_{idx} is {mean[idx][0]}')
-                print(f'the 95 percent credible interval for {varname}_{idx} is {lower_bound[idx][0], upper_bound[idx][0]}')
-        except:
-            #number_of_params = 1,  param is 1d array
-            print('-'*20)
-            print(f'the mean of {varname} is {mean}')
-            print(f'the 95 percent credible interval for {varname} is {lower_bound, upper_bound}')
+        # except:
+        #number_of_params = 1,  param is 1d array
+        mean = str(round(mean, 4))
+        lower_bound = str(round(lower_bound, 4))
+        upper_bound = str(round(upper_bound, 4))
+        return [varname, mean, lower_bound, upper_bound, conclusion]
+
+    def pretty_print(self, list_of_result):
+        threshold_str_l = str(self.lower_threshold)
+        threshold_str_u = str(self.upper_threshold)
+
+        model_fitting_report = [['variable', 'point estimate', threshold_str_l,threshold_str_u, 'significant']]
+        model_fitting_report.extend(list_of_result)
+
+        print('-'*80)
+        print('Model Fit Summary')
+        col_width = max(len(word) for row in model_fitting_report for word in row) + 2  # padding
+        for row in model_fitting_report:
+            print('-'*80)
+            print("".join(word.ljust(col_width) for word in row))
+        print('-'*80)
 
 if __name__ == '__main__':
 
     import pandas as pd
-    from data_preprocessing_tools import transpose_dataframe
+    from data_preprocessing_tools import transpose_dataframe, mark_flood_season
     from utility_functions import get_in_between_dates
 
-    start ='2014-01-01'; end = '2015-12-31'
+    start ='2015-01-01'; end = '2015-12-31'
     num_days = len(get_in_between_dates(start, end))
 
     checkout_df = pd.read_csv('./data/check_out.csv', dtype={'SITENUMBER': str}, index_col=0)
-    df_sample_flat_wide = transpose_dataframe(checkout_df, start=start, end=end, time_varying_variables=['PRCP', 'DEV_GAGE_MAX', 'SPRING', 'SUMMER','FALL'])
+    checkout_df = mark_flood_season(checkout_df, start='2015-10-01', end='2015-12-31')
+
+    df_sample_flat_wide = transpose_dataframe(checkout_df, start=start, end=end, time_varying_variables=['PRCP', 'DEV_GAGE_MAX', 'SPRING', 'SUMMER','FALL','FLOOD_SEASON'])
 
     gage_level = df_sample_flat_wide[[i for i in df_sample_flat_wide.columns if i.startswith('DEV')]].values
     rainfall = df_sample_flat_wide[[i for i in df_sample_flat_wide.columns if i.startswith('PRCP')]].values
     elevations = df_sample_flat_wide[[i for i in df_sample_flat_wide.columns if i.startswith('ELEVATION')]].values
     elevations = np.tile(elevations, num_days)
+
+    flood_season_indicator = df_sample_flat_wide[[i for i in df_sample_flat_wide.columns if i.startswith('FLOOD_SEASON')]].values
     spring = df_sample_flat_wide[[i for i in df_sample_flat_wide.columns if i.startswith('SPRING')]].values
     summer = df_sample_flat_wide[[i for i in df_sample_flat_wide.columns if i.startswith('SUMMER')]].values
     fall = df_sample_flat_wide[[i for i in df_sample_flat_wide.columns if i.startswith('FALL')]].values
@@ -271,8 +378,8 @@ if __name__ == '__main__':
     covariate_m1 = rainfall
     covariate_m2 = np.hstack([rainfall, elevations])
     covariate_m3 = np.hstack([rainfall, elevations, spring, summer, fall])
-    covariate_m4 = np.hstack([rainfall, elevations, rainfall*elevations ])
-
+    covariate_m4 = np.hstack([rainfall, elevations, rainfall*elevations, spring, summer, fall])
+    covariate_m5 = np.hstack([rainfall, flood_season_indicator,flood_season_indicator*rainfall, elevations])
     covariates_m2_new = np.hstack([rainfall[:,3:5], elevations[:,3:5]])
 
     if False:
@@ -280,9 +387,9 @@ if __name__ == '__main__':
                      locations=locations,
                     response_var=gage_level)
         m1.fit(fast_sampling=True, sample_size=200)
-        m1.predict_in_sample()
+        m1._predict_in_sample()
 
-    if True:
+    if False:
         m2 = CarModel(covariates=covariate_m2,
                      locations=locations,
                     response_var=gage_level)
@@ -296,10 +403,16 @@ if __name__ == '__main__':
                      locations=locations,
                     response_var=gage_level)
         m3.fit(fast_sampling=False, sample_size=5000)
+        m3.get_metrics()
 
-    if False:
-        print('start fitting the third model')
-        m4 = CarModel(covariates=covariate_m4,
+    if True:
+        print('start fitting the fourth model')
+        m4 = CarModel(covariates=covariate_m5,
                      locations=locations,
                     response_var=gage_level)
-        m4.fit(fast_sampling=True, sample_size=5000)
+        m4.fit(fast_sampling=False, sample_size=5000)
+        m4.predict()
+        m4.get_metrics()
+        m4.get_residual_by_region()
+        m4.get_acf_and_pacf_by_region()
+        m4.get_residual_plots_by_region()
