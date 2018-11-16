@@ -9,7 +9,7 @@ from PIL import Image
 from statsmodels.tsa.stattools import acf, pacf
 
 theano.config.compute_test_value = "ignore" #no default value error shall occur without this line
-FAST_SAMPLE_ITERATION = 50000 #advi setting
+FAST_SAMPLE_ITERATION = 30 #advi setting
 
 class CarModel:
     '''
@@ -173,69 +173,88 @@ class CarModel:
         resid_df = pd.DataFrame(self.residuals)
         resid_df['watershed'] = self.locations
         self.residual_by_region = resid_df.groupby('watershed').mean()
+        return self.residual_by_region
 
-    def get_residual_plots_by_region(self, filename=None, mode='time series'):
+    def get_residual_plots_by_region(self, figname=None, mode='time series', figsize_baseline=10):
         '''
         provide either time series plot or histogram for residuals; split by different region.
         For each region, we find the mean of every time point
         if there are muliple observations for that regions and that day.
         '''
         if self.residual_by_region is None:
-            self.get_residual_by_region()
+            _ = self.get_residual_by_region()
 
         residual_by_region = self.residual_by_region
 
         if mode == 'time series':
-            fig = residual_by_region.T.plot(figsize=[10,10], alpha=0.7)
+            fig = residual_by_region.T.plot(figsize=[figsize_baseline,figsize_baseline], alpha=0.7)
+            fig  = fig.get_figure()
+            figname = figname + '_tsplot_for_resid.png' if figname is None else 'tsplot_for_resid.png'
+            fig.savefig(figname)
+
         elif mode == 'histogram':
-            fig = residual_by_region.T.hist(figsize=[10,10], alpha=0.7)
+            fig = residual_by_region.T.hist(figsize=[figsize_baseline,figsize_baseline], alpha=0.7)
+            figname = figname + '_histogram_for_resid.png' if figname is None else 'histogram_for_resid.png'
+            plt.savefig(figname) #save the most recent
+
         else:
             raise ValueError("only allow two modes: 'time series' or 'histogram'." )
 
-        fig  = fig.get_figure()
-
-        if filename is None:
-            if mode == 'time series':
-                filename = 'tsplot_for_resid.png'
-            else:
-                filename = 'histogram_for_resid.png'
-        full_dir  = os.path.join(os.getcwd(), filename)
-        fig.savefig(full_dir)
+        full_dir  = os.path.join(os.getcwd(), figname)
         print(f'the image file has been saved to {full_dir}')
-
         f = Image.open(full_dir).show()
 
-    def get_acf_and_pacf_by_region(self, filename=None, fig_size=15):
+    def get_acf_and_pacf_by_region(self, figname=None, fig_size=15):
 
         if self.residual_by_region is None:
-            self.get_residual_by_region()
+            _ = self.get_residual_by_region()
 
         residual_by_region = self.residual_by_region
         locs = list(set(self.locations))
 
-        fig_pacf = plt.figure(figsize=[fig_size, len(locs)*2.5])
-        for idx, loc in enumerate(locs):
-            plt.subplot(len(locs),1,idx + 1)
-            pd.Series(pacf(residual_by_region.T[loc])).plot(kind='bar', color='lightblue')
-            plt.text(0.8,0.5, s = loc, horizontalalignment='left')
-        name_pacf = filename + '_pacf.png' if filename else 'pacf.png'
-        dir_pacf = os.path.join(os.getcwd(), name_pacf)
-        fig_pacf.savefig(dir_pacf)
-        print(f'the image file has been saved to {dir_pacf}')
+        def _plot(figname, type_='acf'):
+            canvass = plt.figure(figsize=[fig_size, len(locs)*2.5])
+            for idx, loc in enumerate(locs):
+                plt.subplot(len(locs),1,idx + 1)
+                if type_ == 'acf':
+                    pd.Series(acf(residual_by_region.T[loc])).plot(kind='bar', color='lightblue')
+                else:
+                    pd.Series(pacf(residual_by_region.T[loc])).plot(kind='bar', color='lightblue')
+                plt.text(0.8,0.5, s=loc, horizontalalignment='left')
 
-        fig_acf = plt.figure(figsize=[15, len(locs)*2.5])
-        for idx, loc in enumerate(locs):
-            plt.subplot(len(locs),1,idx + 1)
-            pd.Series(acf(residual_by_region.T[loc])).plot(kind='bar', color='lightblue')
-            plt.text(0.8,0.5, s = loc, horizontalalignment='left')
+            figname_base = 'acf.png' if type_=='acf' else 'pacf.png'
+            complete_name = '_'.join([figname, figname_base]) if  figname else figname_base
+            full_dir = os.path.join([os.getcwd(), complete_name])
+            canvass.savefig(full_dir)
+            f = Image.open(full_dir).show()
 
-        name_acf = filename + '_acf.png' if filename else 'acf.png'
-        dir_acf = os.path.join(os.getcwd(), name_acf)
-        fig_acf.savefig(dir_acf)
-        print(f'the image file has been saved to {dir_acf}')
+        _plot(figname, type_='acf')
+        _plot(figname, type_='pacf')
 
-        f1 = Image.open(dir_acf).show()
-        f2 = Image.open(dir_pacf).show()
+        # fig_pacf = plt.figure()
+        # for idx, loc in enumerate(locs):
+        #     plt.subplot(len(locs),1,idx + 1)
+        #     pd.Series(pacf(residual_by_region.T[loc])).plot(kind='bar', color='lightblue')
+        #     plt.text(0.8,0.5, s=loc, horizontalalignment='left')
+
+        # name_pacf = figname + '_pacf.png' if figname else 'pacf.png'
+        # dir_pacf = os.path.join(os.getcwd(), name_pacf)
+        # fig_pacf.savefig(dir_pacf)
+        # print(f'the image file has been saved to {dir_pacf}')
+
+        # fig_acf = plt.figure(figsize=[fig_size, len(locs)*2.5])
+        # for idx, loc in enumerate(locs):
+        #     plt.subplot(len(locs),1,idx + 1)
+        #     pd.Series(acf(residual_by_region.T[loc])).plot(kind='bar', color='lightblue')
+        #     plt.text(0.8,0.5, s=loc, horizontalalignment='left')
+
+        # name_acf = figname + '_acf.png' if figname else 'acf.png'
+        # dir_acf = os.path.join(os.getcwd(), name_acf)
+        # fig_acf.savefig(dir_acf)
+        # print(f'the image file has been saved to {dir_acf}')
+
+        # f1 = Image.open(dir_acf).show()
+        # f2 = Image.open(dir_pacf).show()
 
     def predict(self, new_data=None, sample_size=1000, use_median=False):
         '''if there is no new data given, assume in-sample prediction. otherwise do it for new_x'''
@@ -318,6 +337,8 @@ class CarModel:
         lower_bound = np.percentile(trace[varname], self.lower_threshold, axis=0)
         upper_bound = np.percentile(trace[varname], self.upper_threshold, axis=0)
         if upper_bound >= 0 and lower_bound >= 0:
+            conclusion = '***'
+        elif upper_bound <= 0 and lower_bound <= 0:
             conclusion = '***'
         else:
             conclusion = ' '
@@ -410,9 +431,9 @@ if __name__ == '__main__':
         m4 = CarModel(covariates=covariate_m5,
                      locations=locations,
                     response_var=gage_level)
-        m4.fit(fast_sampling=False, sample_size=5000)
-        m4.predict()
-        m4.get_metrics()
-        m4.get_residual_by_region()
-        m4.get_acf_and_pacf_by_region()
-        m4.get_residual_plots_by_region()
+        m4.fit(fast_sampling=True, sample_size=5000)
+        # m4.predict()
+        # m4.get_metrics()
+        # m4.get_residual_by_region()
+        m4.get_acf_and_pacf_by_region('garbage')
+        m4.get_residual_plots_by_region('garbage')
