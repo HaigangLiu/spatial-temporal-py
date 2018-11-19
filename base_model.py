@@ -2,16 +2,21 @@ import pymc3 as pm
 import numpy as np
 
 class BaseModel:
-    def __init__(self, response, locations, *covariates):
+    def __init__(self, response, locations, covariates=None):
         '''
         Users can pass however many covariates, or no covariates at all.
         '''
         self.response = response
         self.locations = locations
-        self.covariates = []
+        self.covariates = covariates
 
-        for covariate in covariates:
-            self.covariates.append(covariate)
+        if covariates is None: #no covariate information included
+            self.covariates = []
+        elif type(covariates) == list:
+            pass
+        else:
+            raise TypeError('covariates must be a list of numpy arrays')
+            return None
 
         self.predicted = None
         self.trace = None
@@ -20,10 +25,7 @@ class BaseModel:
     def get_metrics(self):
 
         if self.predicted is None:
-            self.predict_in_sample()
-
-        if self.predicted is None:
-            self.predict_in_sample()
+            self._predict_in_sample(sample_size=5000, use_median=False)
 
         waic = pm.waic(self.trace, self.model).WAIC
         loo = pm.loo(self.trace, self.model).LOO
@@ -46,9 +48,9 @@ class BaseModel:
         need to generate three attributes when inherited:
         self.trace, self.model, and self.predicted
         '''
-        pass
+        raise NotImplementedError('this is the fit method base class. Should not be called in common use case.')
 
-    def predict_in_sample(self, sample_size=5000, use_median=False):
+    def _predict_in_sample(self, sample_size, use_median):
 
         with self.model:
             simulated_values = pm.sample_ppc(self.trace)['Y']
@@ -58,7 +60,7 @@ class BaseModel:
             self.predicted = np.mean(simulated_values, axis=0)
         return self.predicted
 
-    def get_parameter_estimation(self, varnames, sig_level=0.05):
+    def get_parameter_estimation(self, varnames, sig_level):
         if self.trace is None:
             self.fit()
 
@@ -74,9 +76,9 @@ class BaseModel:
             lower_bound = np.percentile(trace[varname], lower_threshold, axis=0)
             upper_bound = np.percentile(trace[varname], upper_threshold, axis=0)
 
-            if upper_bound >= 0 and lower_bound >= 0:
+            if upper_bound > 0 and lower_bound > 0:
                 conclusion = '***'
-            elif upper_bound <= 0 and lower_bound <= 0:
+            elif upper_bound < 0 and lower_bound < 0:
                 conclusion = '***'
             else:
                 conclusion = ' '
