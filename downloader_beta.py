@@ -47,8 +47,9 @@ class DailyFloodDataDownloader:
         else:
             print('all locations, including wells and glaciers, will be examined.')
             print('this might make the process longer.')
+            print('please turn this off by eight_digit_station_only=True unless you have reason to do otherwise')
 
-        self.station_info_dict = self._get_stations(self.state, eight_digit_station_only=True)
+        self.station_info_dict = self._get_stations(self.state, eight_digit_station_only=eight_digit_station_only)
         self.stations = list(self.station_info_dict.keys())
 
         print('finished generating locations, now start downloading files.')
@@ -107,7 +108,13 @@ class DailyFloodDataDownloader:
         keywords = '\t'.join(list(additional_info.keys()))
         values = '\t'.join(list(additional_info.values()))
 
-        content = requests.get(station_url).text
+        try:
+            content = requests.get(station_url).text
+        except requests.exceptions.SSLError:
+            if self.verbose:
+                print('encountered a bad connection, will pass this one')
+            return None
+
         obs = []; header = None
 
         if content is None:
@@ -224,7 +231,7 @@ class DailyFloodDataDownloader:
         print(f'the location of file is {os.getcwd()}')
 
 if __name__ == '__main__':
-    test = DailyFloodDataDownloader(start='2010-01-01', end='2010-01-02', state='SC', cap=10, eight_digit_station_only=False)
+    test = DailyFloodDataDownloader(start='2010-01-01', end='2016-12-31', state='SC', cap=None, eight_digit_station_only=True)
     test.run()
 
     # https://waterdata.usgs.gov/nwis/dv?cb_00065=on&format=rdb&site_no=02153051&referred_module=sw&period=&begin_date=2017-11-20&end_date=2018-11-20
