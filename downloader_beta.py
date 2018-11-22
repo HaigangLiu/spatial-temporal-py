@@ -6,18 +6,33 @@ import pandas as pd
 ATTRIBUTE_NUMBER = {'GAGE': '00065'}  #gage level
 STAT_IDENTIFIER = {'MAX': '00001', 'MIN':'00002', 'MEAN': '00003'} #max, min, mean
 
-# name = get_stations('South Carolina', short_version=True)
-# https://waterdata.usgs.gov/nwis/dv?cb_00065=on&format=rdb&site_no=02153051&referred_module=sw&period=&begin_date=2017-11-20&end_date=2018-11-20
-
 class DailyFloodDataDownloader:
-
     def __init__(self, start, end, state, short_version=True, verbose=False):
 
+        '''
+        download flood data for given state within a given time frame
+        1. first go to nws website to grab a list of available stations in that area
+        2. generate a url
+        3. parse that url and clean the data, which are written to a file
+        4. merge all files for all location in that state
+
+        Args:
+            start (string): the starting time, format: '1990-01-01'
+            end (string): the end time, format: '1990-01-01'
+            state (string): the name or acrynom for that state
+                all of these will work: 'SC', 'South Carolina', 'sc'
+            short_version (boolean): if true, only use stream station and discard other stations which might be irrelelavent
+            verbose (boolean): if true, more information will be given when downloading. Otherwise only progress will be reported.
+
+        Example:
+            >>test = DailyFloodDataDownloader(start='2010-01-01', end='2010-01-02', state='SC')
+            >>test.run()
+        '''
         self.state = state if len(state) == 2 else get_state_fullname(state,
             reverse=True)
         self.verbose =verbose
         self.job_list = []
-        self.save_file_name = '_'.join([start, 'to',end])
+        self.save_file_name = '_'.join([start, 'to',end]) + '.txt'
 
         var_code = ATTRIBUTE_NUMBER['GAGE']
         _url_part_1 = f'https://waterdata.usgs.gov/nwis/dv?cb_{var_code}=on&format=rdb&site_no='
@@ -31,7 +46,9 @@ class DailyFloodDataDownloader:
         else:
             print('all locations, including wells and glaciers, will be examined.')
             print('this might make the process longer.')
-        self.stations = self._get_stations(self.state, short_version=True)
+
+        self.station_info_dict = self._get_stations(self.state, short_version=True)
+        self.stations = list(self.station_info_dict.keys())
         print('finished generating locations, now start downloading files.')
         print('-'*40)
 
@@ -39,36 +56,46 @@ class DailyFloodDataDownloader:
             job = _url_part_1 + str(station) + _url_part_2
             self.job_list.append(job)
 
+
     def _get_stations(self, state, short_version):
         if len(state) > 2:
-            state = get_state_fullname(state, reverse=True)#get acrynom
-        url = f'https://waterdata.usgs.gov/nwis/inventory?state_cd={state.lower()}'
-        soup_object = BeautifulSoup(requests.get(url).content, 'lxml')
-        search_result = soup_object.find(id='stationTable')
+                state = get_state_fullname(state, reverse=True)#get acrynom
+        state = state.lower()
 
-        list_of_station_numbers = []
-        for option in search_result.find_all('option'):
-            station_num = option['value']
-            list_of_station_numbers.append(station_num)
-        if short_version: #only keep 8-digit locations
-            list_of_station_numbers = [entry for entry in list_of_station_numbers
-            if len(entry) == 8]
-        return list_of_station_numbers
+        dict_of_stations = {}
+        url = f'https://waterdata.usgs.gov/nwis/nwismap?state_cd={state}&format=sitefile_output&sitefile_output_format=rdb&column_name=agency_cd&column_name=site_no&column_name=station_nm&column_name=dec_lat_va&column_name=dec_long_va'
 
-    def page_parser(self, job_url, jobname):
+        for line in requests.get(url).text.split('\n'):
+            if line.startswith('USGS'):
+                siteid, name, latitude, longitude = line.split('\t')[1:5]
+                dict_of_stations[siteid] = (name, latitude, longitude)
+
+        if short_version:
+            shorter_dict = {}
+            for k, v in dict_of_stations.items():
+                if len(k) == 8:
+                    shorter_dict[k] = v
+                else:
+                    pass
+            return shorter_dict
+        return dict_of_stations
+
+    def page_parser(self, station_url, stationid):
         '''
         Args: the station id (str)
         return: a dataframe of gage informaion
         '''
-        jobname = str(jobname)
-        content = requests.get(job_url).text
+
+        name, latitude, longitude = self.station_info_dict[stationid]
+        stationid = str(stationid)
+        content = requests.get(station_url).text
         obs = []; header = None
 
         if content is None:
             print(f'Got an empty page')
             return None
 
-        textfile_name = '.'.join([jobname, 'txt'])
+        textfile_name = '.'.join([stationid, 'txt'])
         textfile_name = os.path.join('./flood2', textfile_name)
 
         with open(textfile_name, 'w') as f:
@@ -78,9 +105,12 @@ class DailyFloodDataDownloader:
 
                 if is_var_name:
                     header = line
+                    header = '\t'.join(['name', 'latitude', 'longitude', header])
+                    print(header)
                     f.write(header+'\n')
 
                 if is_obs:
+                    line = '\t'.join([name, latitude, longitude, line])
                     f.write(line+'\n')
 
         if os.path.getsize(textfile_name):
@@ -95,7 +125,7 @@ class DailyFloodDataDownloader:
 
     def file_formatter(self, filename):
         '''
-        renaming several variables
+        renaming several variables and remove duplicate columns
         '''
         look_up_table = {} # for renaming scheme
         for att_num in  ATTRIBUTE_NUMBER.items():
@@ -106,7 +136,12 @@ class DailyFloodDataDownloader:
                 new_v = ('_'.join([v1, v2]))
                 look_up_table[new_key] = new_v
 
-        additional_info = {'DATE':'datetime', 'SITENUMBER': 'site_no'}
+        additional_info = {'DATE':'datetime',
+                           'SITENUMBER': 'site_no',
+                           'LATITUDE':'latitude',
+                           'LONGITUDE': 'longitude',
+                           'STATIONNAME': 'name'}
+
         look_up_table.update(additional_info)
 
         dataframe = pd.read_csv(filename, sep='\t', dtype={'site_no':str})
@@ -119,20 +154,20 @@ class DailyFloodDataDownloader:
                 elif col.endswith('_cd'):
                     dataframe.drop([col], axis=1, inplace=True)
                 else:
-                    pass #delete all others
-        dataframe.to_csv(filename)
+                    pass
+        dataframe.to_csv(filename, index=False)
+        #index will be detemined after combining all small files
 
     def run(self):
-
-        for idx, job in enumerate(self.job_list):
-            filename = self.page_parser(job, jobname=idx)
+        for idx, (stationurl, stationid) in enumerate(zip(self.job_list, self.stations)):
+            filename = self.page_parser(station_url=stationurl, stationid=stationid)
             if filename:
                 self.file_formatter(filename)
             if idx%20 == 0: #progress tracker
                 print(f'finished processing {idx}/{len(self.job_list)}')
 
-        with open(save_file_name, 'w') as file:
-            header = ','.join(['SITENUMBER','DATE', 'GAGE_MAX', 'GAGE_MIN',
+        with open(self.save_file_name, 'w') as file:
+            header = ','.join(['SITENNAME','LATITUDE','LONGITUDE', 'SITENUMBER','DATE', 'GAGE_MAX', 'GAGE_MIN',
            'GAGE_MEAN\n'])
             file.write(header)
             for small_file in os.listdir('./flood2'):
@@ -146,9 +181,11 @@ class DailyFloodDataDownloader:
 if __name__ == '__main__':
     test = DailyFloodDataDownloader(start='2010-01-01', end='2010-01-02', state='SC')
     test.run()
-    # print(test.job_list[1])
 
     # test.page_parser(test.job_list[1])
     # # print(s)
 
 
+
+    # name = get_stations('South Carolina', short_version=True)
+    # https://waterdata.usgs.gov/nwis/dv?cb_00065=on&format=rdb&site_no=02153051&referred_module=sw&period=&begin_date=2017-11-20&end_date=2018-11-20
