@@ -37,10 +37,8 @@ class InverseDistanceModel:
             self.model = KDtree(locations)
 
     def _predict_single_loc(self, new_loc, num_neighbors, p):
-        # if there is a value already in the location to predict, just use that
-        # value
+        # if there is a value already in the location to predict, just use that value
         dist, index = self.model.query(new_loc, num_neighbors)
-
         try:
             if 0 in list(dist):
                 argmax = index[0]
@@ -81,17 +79,24 @@ class InverseDistanceModel:
                 smallest_k = k
 
         print(f'the distance type is fixed throughout the test, which is p={p}.')
-        print('And this can be changed by setting p=0.5 for instance')
+        print('and this can be changed by setting p=0.5 for instance')
         print(f'the smallest error occurs when number of num_neighbors={smallest_k}')
         print(f'the corresponding mse value is {smallest_mse}')
         print('-'*40)
         return records
 
 if __name__ == '__main__':
+
     from SampleDataLoader import load_rainfall_data
     data = load_rainfall_data('monthly')
+    loc = data[['LATITUDE', 'LONGITUDE']].values
+    y = data['PRCP'].values
+    idw_model = InverseDistanceModel(loc, y)
 
-    idw_model = InverseDistanceModel( data[['LATITUDE', 'LONGITUDE']].values, data['PRCP'].values)
+    idw_model.fit()
+    idw_model.predict(loc, num_neighbors=10)
+
+    s = idw_model.select_best_k()
     s = idw_model.select_best_k(p=0.3)
     s = idw_model.select_best_k(p=0.5)
     s = idw_model.select_best_k(p=1)
