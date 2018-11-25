@@ -1,106 +1,98 @@
-import pandas as pd
 import numpy as np
 from scipy.spatial import cKDTree as KDtree
-from utilities_functions import coordinates_converter
+from sklearn.model_selection import train_test_split
 
-class SpatialModelIDW:
-
+class InverseDistanceModel:
     '''
-    The basic idea is to borrow info from neighbor.
-    df (pandas dataframe): needs to have the LATITUDE and LONGITUDE column
-        and the column of variable of interest.
+    Make predictions based on neigbouring values
+    locations (numpy array): a n-d array input indicating the locations
+    response (numpy array): a 1-d array with repsonse variable
 
-    response_var (str): Variable name
-    split_ratio (float): Split ratio between train and test set
-    K (int): number of neighbors to borrow information from
+    use from_pandas if users wish to build the model from pandas. See instructions below.
     '''
+    def __init__(self, locations, response):
+        self.response = response[:,None]
+        self.locations = locations
 
-    def __init__(self, df, response_var = 'PRCP', split_ratio = 0.7, K = 5):
+    @classmethod
+    def from_pandas(cls, dataframe, locations, response):
+        '''
+        build the models with a pandas dataframe
+        dataframe (pandas dataframe with location infor)
+        locations (list): name of the column(s) with location information
+        response (string): name of the column with response variable
+        '''
+        try:
+            r = dataframe[response].values
+            l = dataframe[locations].values
+            return cls(l, r)
+        except KeyError:
+            print('Double check the column names since they cannot be found in the dataframe')
+            return None
 
-        self.response_var = response_var
+    def fit(self, locations=None):
+        if locations is None:
+            self.model = KDtree(self.locations)
+        else:
+            self.model = KDtree(locations)
 
-        X = coordinates_converter(df).values
-        y = df[self.response_var].values
+    def _predict_single_loc(self, new_loc, num_neighbors, p):
+        # there is a value already in the location to predict, just use that value
+        dist, index = self.model.query(new_loc, num_neighbors)
 
-        all_index = list(range(len(df)))
-        train_size  = int(round(len(df)*split_ratio,0))
-
-        train_index = np.random.choice(all_index, train_size)
-        test_index = [idx for idx in all_index if idx not in train_index]
-
-        self.X_train = X[train_index]; self.X_test = X[test_index]
-        self.y_train = y[train_index]; self.y_test = y[test_index]
-
-        self.train_loc_cache = df.loc[train_index, ['LATITUDE','LONGITUDE']]
-        self.test_loc_cache = df.loc[test_index, ['LATITUDE','LONGITUDE']]
-
-        self.K = K
-        if self.K == 'auto':
-            self.K = self._auto_choose_k(20)
-
-    def fit(self):
-        self.idw_model = KDtree(self.X_train)
-
-    def _single_location_look_up(self, new_loc, new_real_value, p):
-
-        dist, index = self.idw_model.query(new_loc, self.K)
-        if 0 in list(dist):
-            argmax = index[0]
-            return self.y_train[argmax]
+        try:
+            if 0 in list(dist):
+                argmax = index[0]
+                return self.response[argmax]
+        except TypeError:
+            if dist == 0:
+                argmax = index[0]
+                return self.response[argmax]
 
         weights = 1/(dist**p)
         standardized_weights = weights/np.sum(weights)
-        prediction = sum(standardized_weights*self.y_train[index])
+        prediction = sum(standardized_weights*self.response[index])
         return prediction
 
-    def predict(self, new_df = None, distance_param = 2):
-
-        if new_df:
-            self.X_test = coordinates_converter(new_df).values
-            self.y_test = new_df[self.response_var].values
-
+    def predict(self, new_data, num_neighbors, p=2):
         predictions = []
-        for i, j in zip(self.X_test, self.y_test):
-            prediction = self._single_location_look_up(i, j, p = distance_param)
+        for row in new_data:
+            prediction = self._predict_single_loc(row, num_neighbors=num_neighbors, p=p)
             predictions.append(prediction)
+        self.predicted = np.array(predictions)
+        return self.predicted.ravel()
 
-        self.predictions = np.array(predictions)
+    def select_best_k(self, test_size_ratio=0.4, p=2):
+        X_train, X_test, y_train, y_test = train_test_split(self.locations, self.response, test_size=test_size_ratio)
+        k_pool = [i + 1 for i in range(20)]
 
-        l1_loss = np.mean(np.abs(self.predictions - self.y_test))
-        l2_loss = np.mean(np.square(self.predictions - self.y_test))
-        self.summary = {'l1_loss': l1_loss, 'l2_loss': l2_loss}
+        records = []
+        smallest_mse = 5000
+        smallest_k = 0
+        for k in k_pool:
+            self.fit(X_train)
+            predictions = self.predict(X_test, num_neighbors=k, p=p)
+            mse = np.mean(np.abs(y_test - predictions))
+            records.append(tuple([k, mse]))
 
-        return self.predictions
+            if mse < smallest_mse:
+                smallest_mse = mse
+                smallest_k = k
 
-    def _auto_choose_k(self, test_range):
-        min_loss = 10000
-        argmin = -1
-
-        self.fit()
-
-        for i in range(test_range):
-            self.K = i + 2
-            self.predict()
-            loss = self.summary['l1_loss']
-            if loss < min_loss:
-
-                min_loss = loss
-                argmin = self.K
-
-        print(f'tested 2 to {test_range} neighbors, K = {argmin} gives the best MSE')
-        return argmin
+        print(f'the distance type is fixed throughout the test, which is p={p}.')
+        print('And this can be changed by setting p=0.5 for instance')
+        print(f'the smallest error occurs when number of num_neighbors={smallest_k}')
+        print(f'the corresponding mse value is {smallest_mse}')
+        print('-'*40)
+        return records
 
 if __name__ == '__main__':
-
     from SampleDataLoader import load_rainfall_data
     data = load_rainfall_data('monthly')
 
-    idw_model = SpatialModelIDW(data, 'PRCP', K = 'auto')
-    idw_model.fit()
-    vars_ = idw_model.predict()
-
-    import pickle
-    with open('idw.pickle', 'wb') as handler:
-        pickle.dump(idw_model, handler, protocol=pickle.HIGHEST_PROTOCOL)
-    print(idw_model.summary)
-    #{'l1_loss': 1.4411817577976724, 'l2_loss': 4.652838883772935}
+    idw_model = InverseDistanceModel( data[['LATITUDE', 'LONGITUDE']].values, data['PRCP'].values)
+    s = idw_model.select_best_k(p=0.3)
+    s = idw_model.select_best_k(p=0.5)
+    s = idw_model.select_best_k(p=1)
+    s = idw_model.select_best_k(p=1.5)
+    s = idw_model.select_best_k(p=2)
