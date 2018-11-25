@@ -37,7 +37,8 @@ class InverseDistanceModel:
             self.model = KDtree(locations)
 
     def _predict_single_loc(self, new_loc, num_neighbors, p):
-        # there is a value already in the location to predict, just use that value
+        # if there is a value already in the location to predict, just use that
+        # value
         dist, index = self.model.query(new_loc, num_neighbors)
 
         try:
