@@ -61,7 +61,8 @@ class SpatialPlotter:
         '''
         Add location markers on the canvass
         Args:
-            points: the points to be added. We assume the first two dimension are locational information
+            points: the points to be added. We assume the first two dimension are locational information.
+            The orders has to be latitude, longitude
         '''
         points = self._pandas_to_list(points)
         for point in points:
@@ -137,7 +138,7 @@ class SpatialPlotter:
         print(f'the map has been saved to {filename}')
 
         if filename == 'map_test.html':
-            print('to change to a different name, assign a name to filename argument')
+            print('to change to a different name, assign a name to filename')
             print('when calling plot() function')
         if open_in_browser:
             webbrowser.open('file://' + os.path.realpath(output_path))
@@ -146,13 +147,13 @@ if __name__ == '__main__':
     #the test based on list input
     s = SpatialPlotter([[34, -80]])
     s.add_point([[33.9, -80], [33.8, -80], [33.2, -80]])\
-     .add_contour('South Carolina')\
-     .add_value([[33.9, -80, 2], [33.8, -80, 1], [33.2, -80,1]])\
+     .add_contour('North Carolina')\
+     .add_value([[33.9, -80, 1], [34.9, -80, 20]])\
      .plot()
 
-    #the test case based on dataframe input
-    from SampleDataLoader import load_rainfall_data
-    test = load_rainfall_data('monthly')
-    new_map = SpatialPlotter([[34, -80]])\
-                .add_point(test[['LATITUDE', 'LONGITUDE']])\
-                .plot(filename='map_test2.html')
+    # #the test case based on dataframe input
+    # from SampleDataLoader import load_rainfall_data
+    # test = load_rainfall_data('monthly')
+    # new_map = SpatialPlotter([[34, -80]])\
+    #             .add_point(test[['LATITUDE', 'LONGITUDE']])\
+    #             .plot(filename='map_test2.html')
