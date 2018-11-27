@@ -7,41 +7,93 @@ import theano.tensor as tt
 import matplotlib.pyplot as plt
 from PIL import Image
 from statsmodels.tsa.stattools import acf, pacf
+from base_model import BaseModel
 
 theano.config.compute_test_value = "ignore" #no default value error shall occur without this line
 FAST_SAMPLE_ITERATION = 50 #advi setting
 
-class CarModel:
+class CarModel(BaseModel):
     '''
     Fit a conditional autoregressive model (spatial-temporal model)
     This may NOT work with spatial data (not tested for that case);
     To fit spatial  model, use spatial_model module
     Args:
-        response_var (np.array): 1-d array for response variable
+        response (np.array): 1-d array for response variable
         location_var: 1-d array to store location information
         covariates: nd array to store covariates; a column of constants will be added automatically
     '''
-    def __init__(self, response_var, locations, covariates=None):
+    def __init__(self, response, locations, covariates=None, autoreg=1):
+        super().__init__(response, locations, covariates)
 
-        self.response_var = response_var
-        self.locations = locations
-        self.N = self.response_var.shape[0] # N is number of locations
-        self.number_of_days = response_var.shape[1]
-        self.covariates = theano.shared(covariates)
-        self.original_dim_cov = covariates.shape
+        try:
+            self.N = response.shape[0]
+            self.number_of_days = response.shape[1]
+        except ValueError:
+            print('Reshape your data either using array.reshape(-1, 1) if you data has single feature')
+            return None
+
+        covariates = [] if covariates is None else covariates
+
+        if covariates:
+            if type(covariates) != list:
+                raise TypeError('covariates has to be a list of numpy array or NoneType by default')
+            self.dim = len(covariates)
+        else:
+            self.dim = 0
+
+        # dim_check = self.number_of_days
+        # self.covariates = theano.shared(covariates)
+        # self.original_dim_cov = covariates.shape
 
         if self.number_of_days <= 1:
-            raise ValueError('the data only contains info of one day. Use spatial module instead')
-        if covariates.shape[1]%self.number_of_days != 0:
-            example_1 = f'if y is {self.N}x{self.number_of_days}, '
-            example_2 = f'then the second dim of x has to be a muliple of {self.number_of_days}'
-            raise ValueError(example_1 + example_2)
-        else:
-            self.dim = int(covariates.shape[1]/self.number_of_days)
-        self.intercepts = np.ones((self.N, self.number_of_days))
+            raise ValueError('the data only contains info of one day. Use spatial module instead to avoid unexpected behavior')
 
-        print('-'*20)
+        covariates_ = [] #pure sanity check
+        for covariate in covariates:
+            try:
+                dim_cov = covariate.shape[1]
+            except ValueError: #shape like (28, )
+                covariate = np.tile(covariate[:, None], self.number_of_days)
+                dim_cov = covariate.shape[1]
+
+            if dim_cov == self.number_of_days:
+                pass
+            else:
+                print(covariate.shape[1])
+                print(self.number_of_days)
+                raise ValueError('the number of cols must be equal num of days or equal to 1')
+            covariates_.append(covariate)
+
+        self.covariates = covariates_
+        del covariates_
+
+        self.autoregressive_terms = []
+
+        if autoreg: # redefine both x and y
+            covariates_auto = [] #new X
+            for covariate in self.covariates:
+                covariate_remove_extra_days = covariate[:, autoreg:]
+                covariates_auto.append(covariate_remove_extra_days)
+            self.covariates = covariates_auto; del covariates_auto
+
+            for i in range(autoreg): #new Y_{t-1}
+
+                right = self.number_of_days - autoreg + i
+                make_autoreg_term = self.response[:, i:right]
+                self.autoregressive_terms.append(make_autoreg_term)
+
+            self.response = self.response[:, autoreg:]
+            self.number_of_days = self.number_of_days - autoreg
+            print(f'autoregressive term is {autoreg}, and first {autoreg} day(s) will be used as covariates')
+
+        if self.covariates:
+            self.intercepts = np.ones((self.N, self.number_of_days))
+        else:
+            self.intercepts = None
+
+        print('-'*40)
         print('BASIC INFO FROM INPUT')
+        print('-'*10)
         print(f'The sample size is {self.N}.')
         print(f'The time span is {self.number_of_days} days, and there are {self.dim} covariates in the model')
         print('Double check the input if any of these information does not seem right.')
@@ -76,7 +128,6 @@ class CarModel:
         for idx, row in enumerate(neighbor_matrix):
             mask = np.argwhere(row == 1).ravel().tolist()
             mask.remove(idx) #delete the location itself.
-
             adjacent_matrix.append(mask)
             weight_matrix.append([1]*len(mask))
 
@@ -91,23 +142,9 @@ class CarModel:
         self.weight_matrix = wmat2
         self.D = np.diag(self.weight_matrix.sum(axis=1))
 
-    def fit(self, fast_sampling=True, sample_size=3000, sig=0.95):
-
-        fitted_parameters = []
-        if self.dim > 1:
-            where_to_slice = [self.number_of_days*i for i in range(self.dim)]
-            where_to_slice.pop(0)
-            self.covariates_split = np.hsplit(self.covariates, where_to_slice)
-        else:
-            self.covariates_split = [self.covariates]
+    def fit(self, sample_size=3000, sig=0.95):
 
         with pm.Model() as self.model:
-            beta_variables = []
-            beta_names = []
-            for i in range(self.dim+1):
-                var_name = '_'.join(['beta', str(i)])
-                beta_names.append(var_name)
-                beta_variables.append(pm.Normal(var_name, mu=0.0, tau=1.0))
 
             # Priors for spatial random effects
             tau = pm.Gamma('tau', alpha=2., beta=2.)
@@ -117,68 +154,37 @@ class CarModel:
                               tau=tau*(self.D - alpha*self.weight_matrix),
                               shape=(self.number_of_days, self.N) #30 x 94 sample size by dim
                               )
+            mu_ = phi.T
 
-            beta_0 = beta_variables.pop(0)
-            mu_ = self.intercepts*beta_0 + phi.T
-            for idx, beta_ in enumerate(beta_variables):
-                mu_ += beta_*self.covariates_split[idx]
+            if self.covariates: #add covars
+                beta_variables = []; beta_names = []
+                cov_with_intercept = self.covariates.copy()
+                cov_with_intercept.append(self.intercepts)
+
+                for idx, covariate in enumerate(cov_with_intercept):
+                    var_name = '_'.join(['beta', str(idx)])
+                    beta_var = pm.Normal(var_name, mu=0.0, tau=1.0)
+
+                    beta_names.append(var_name)
+                    beta_variables.append(beta_var)
+                    mu_  = mu_ + beta_var*covariate
+
+            if self.autoregressive_terms: #add autoterms
+                rho_variables = []; rho_names =[]
+                autos = self.autoregressive_terms.copy()
+
+                for idx, autoterm in enumerate(reversed(autos)):
+                    var_name = '_'.join(['rho', str(idx+1)])
+                    rho_var = pm.Normal(var_name, mu=0.0, tau=1.0)
+
+                    rho_names.append(var_name)
+                    rho_variables.append(rho_var)
+                    mu_  = mu_ + rho_var*autoterm
 
             # Mean model
-            mu = pm.Deterministic('mu', mu_)
             theta_sd = pm.Gamma('theta_sd', alpha=1.0, beta=1.0)
             # Likelihood
-            Yi = pm.Normal('Yi', mu=mu, tau=theta_sd, observed=self.response_var)
-
-            if fast_sampling:
-                inference = pm.ADVI()
-                approx = pm.fit(n=FAST_SAMPLE_ITERATION, method=inference)
-                self.trace = approx.sample(draws=sample_size)
-            else:
-                self.trace = pm.sample(sample_size, cores=2, tune=5000)
-            for beta_name in beta_names:
-                fitted_parameters.append(self.get_parameter_estimation(sig_level=sig, varname=beta_name))
-
-            tau = self.get_parameter_estimation(sig_level=sig, varname='tau')
-            fitted_parameters.append(tau)
-
-            alpha = self.get_parameter_estimation(sig_level=sig, varname='alpha')
-            fitted_parameters.append(alpha)
-
-        #report
-        threshold_str_l = str(self.lower_threshold)
-        threshold_str_u = str(self.upper_threshold)
-        model_fitting_report = [['variable', 'point estimate', threshold_str_l,threshold_str_u, 'significant']]
-        model_fitting_report.extend(fitted_parameters)
-
-        header = 'Model Fitting Report'
-        self._pretty_print(header, model_fitting_report)
-
-    def get_metrics(self):
-        '''
-        generate a few metrics for model comparison
-        '''
-        if self.l1_loss is None:
-            self.predict()
-
-        if self.l2_loss is None:
-            self.predict()
-
-        self.result_waic = pm.waic(self.trace, self.model)
-        self.result_leave_one_out = pm.loo(self.trace, self.model)
-
-        loo = self.result_leave_one_out.LOO
-        waic = self.result_waic.WAIC
-
-        table = [['metric', 'value']]
-        metrics = []
-        metrics.append(['mse', str(round(self.l2_loss, 4))])
-        metrics.append(['mae', str(round(self.l1_loss, 4))])
-        metrics.append(['loo',str(round(loo, 4))])
-        metrics.append(['aic', str(round(waic, 4))])
-        table.extend(metrics)
-
-        header = 'Model Fitting Metrics Report'
-        self._pretty_print(header, table, table_len=50)
+            Yi = pm.Normal('Yi', mu=mu_, tau=theta_sd, observed=self.response)
 
     def get_residual_by_region(self):
         '''
@@ -240,7 +246,6 @@ class CarModel:
                 else:
                     pd.Series(pacf(residual_by_region.T[loc])).plot(kind='bar', color='lightblue')
                 plt.text(0.8,0.5, s=loc, horizontalalignment='left')
-
             figname_base = 'acf.png' if type_=='acf' else 'pacf.png'
             complete_name = '_'.join([figname, figname_base]) if  figname else figname_base
             full_dir = os.path.join(os.getcwd(), complete_name)
@@ -261,21 +266,6 @@ class CarModel:
             self._predict_out_of_sample(new_x=new_data, sample_size=sample_size, use_median=use_median)
             return self.y_predicted_out_of_sample
 
-    def _predict_in_sample(self, sample_size=1000, use_median=False):
-
-        with self.model:
-            simulated_values = pm.sample_ppc(self.trace)['Yi']
-        if use_median: #might be pretty slow
-            self.y_predicted_in_sample = np.median(simulated_values, axis=0)
-        else:
-            self.y_predicted_in_sample = np.mean(simulated_values, axis=0)
-        self.residuals = self.response_var - self.y_predicted_in_sample
-
-        #report mse and mae
-        self.l1_loss = np.mean(np.abs(self.response_var - self.y_predicted_in_sample))
-        self.l2_loss = np.mean(np.square(self.response_var - self.y_predicted_in_sample))
-        print(f'The MAE of this model based on in-sample predictions is {self.l1_loss }')
-        print(f'The MSE of this model based on in-sample predictions is {self.l2_loss}')
 
     def _predict_out_of_sample(self, new_x, sample_size=1000,  use_median=False):
 
@@ -319,39 +309,6 @@ class CarModel:
         self.y_predicted_out_of_sample = np.mean(simulated_values, axis=0)
         self.y_predicted_out_of_sample = self.y_predicted_out_of_sample[:, 0:days] #only first few column are relevant
 
-    def get_parameter_estimation(self, sig_level, varname, trace=None):
-
-        trace = self.trace if trace is None else trace #default trace
-        mean = trace[varname].mean(axis=0)
-
-        self.lower_threshold = (100 - sig_level*100)/2
-        self.upper_threshold = 100 - self.lower_threshold
-        lower_bound = np.percentile(trace[varname], self.lower_threshold, axis=0)
-        upper_bound = np.percentile(trace[varname], self.upper_threshold, axis=0)
-        if upper_bound >= 0 and lower_bound >= 0:
-            conclusion = '***'
-        elif upper_bound <= 0 and lower_bound <= 0:
-            conclusion = '***'
-        else:
-            conclusion = ' '
-
-        mean = str(round(mean, 4))
-        lower_bound = str(round(lower_bound, 4))
-        upper_bound = str(round(upper_bound, 4))
-        return [varname, mean, lower_bound, upper_bound, conclusion]
-
-    def _pretty_print(self, header, table_to_print, table_len=80):
-        '''
-        generate a better-looking table to organize information.
-        '''
-        print('-'*table_len)
-        print(header)
-        col_width = max(len(word) for row in table_to_print for word in row) + 2  # padding
-        for row in table_to_print:
-            print('-'*table_len)
-            print("".join(word.ljust(col_width) for word in row))
-        print('-'*table_len)
-
 if __name__ == '__main__':
 
     import pandas as pd
@@ -384,16 +341,23 @@ if __name__ == '__main__':
     covariate_m5 = np.hstack([rainfall, flood_season_indicator,flood_season_indicator*rainfall, elevations])
 
     if False:
-        m1 = CarModel(covariates=covariate_m1,
+        m1 = CarModel(covariates=[rainfall, elevations],
                      locations=locations,
-                    response_var=gage_level)
-        m1.fit(fast_sampling=True, sample_size=200)
-        m1._predict_in_sample()
+                    response=gage_level)
+        m1.fast_sample(iters=200)
+        # m1._predict_in_sample()
+    if True:
+        m1 = CarModel(covariates=[rainfall, elevations],
+                     locations=locations,
+                    response=gage_level,
+                    autoreg=2)
+        m1.sample()
+        m1.get_parameter_estimation(['beta_0', 'beta_1', 'rho_1','rho_2'], 0.95)
 
     if False:
         m2 = CarModel(covariates=covariate_m2,
                      locations=locations,
-                    response_var=gage_level)
+                    response=gage_level)
         m2.fit(fast_sampling=False, sample_size=1000)
         m2.predict(covariates_m2_new)
         m2.get_metrics()
@@ -401,16 +365,16 @@ if __name__ == '__main__':
     if False:
         print('start fitting the third model')
         m3 = CarModel(covariates=covariate_m3,
-                     locations=locations,
-                    response_var=gage_level)
+                      locations=locations,
+                      response=gage_level)
         m3.fit(fast_sampling=False, sample_size=5000)
         m3.get_metrics()
 
-    if True:
+    if False:
         print('start fitting the fourth model')
         m4 = CarModel(covariates=covariate_m5,
                      locations=locations,
-                    response_var=gage_level)
+                    response=gage_level)
         m4.fit(fast_sampling=True, sample_size=5000)
         # m4.predict()
         m4.get_metrics()
