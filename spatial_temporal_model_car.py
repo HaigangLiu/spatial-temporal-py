@@ -41,12 +41,8 @@ class CarModel(BaseModel):
         else:
             self.dim = 0
 
-        # dim_check = self.number_of_days
-        # self.covariates = theano.shared(covariates)
-        # self.original_dim_cov = covariates.shape
-
         if self.number_of_days <= 1:
-            raise ValueError('the data only contains info of one day. Use spatial module instead to avoid unexpected behavior')
+            raise ValueError('the data only contains one day. Use spatial module to avoid unexpected behavior')
 
         covariates_ = [] #pure sanity check
         for covariate in covariates:
@@ -77,7 +73,6 @@ class CarModel(BaseModel):
             self.covariates = covariates_auto; del covariates_auto
 
             for i in range(autoreg): #new Y_{t-1}
-
                 right = self.number_of_days - autoreg + i
                 make_autoreg_term = self.response[:, i:right]
                 self.autoregressive_terms.append(make_autoreg_term)
@@ -109,7 +104,6 @@ class CarModel(BaseModel):
         self.residual_by_region = None #average over stations in that region; time series data
 
     def _get_weight_matrices(self):
-
         try:
             location_list = self.locations.tolist()
         except AttributeError:
@@ -180,11 +174,10 @@ class CarModel(BaseModel):
                     rho_names.append(var_name)
                     rho_variables.append(rho_var)
                     mu_  = mu_ + rho_var*autoterm
-
             # Mean model
             theta_sd = pm.Gamma('theta_sd', alpha=1.0, beta=1.0)
             # Likelihood
-            Yi = pm.Normal('Yi', mu=mu_, tau=theta_sd, observed=self.response)
+            Y = pm.Normal('Y', mu=mu_, tau=theta_sd, observed=self.response)
 
     def get_residual_by_region(self):
         '''
@@ -192,10 +185,11 @@ class CarModel(BaseModel):
         For one regions, there is usually multiple locations and multiple days,
         we average over different locations and thus got time series data for each big region.
         '''
-        if self.residuals is None:
-            self._predict_in_sample()
+        if self.predicted is None:
+            _ = self._predict_in_sample(sample_size=5000, use_median=False)
 
-        resid_df = pd.DataFrame(self.residuals)
+        residuals = self.response - self.predicted
+        resid_df = pd.DataFrame(residuals)
         resid_df['watershed'] = self.locations
         self.residual_by_region = resid_df.groupby('watershed').mean()
         return self.residual_by_region
@@ -260,15 +254,13 @@ class CarModel(BaseModel):
         if new_data is None:
             print('no new data are given. In-sample predictions are made')
             self._predict_in_sample(sample_size=sample_size, use_median=use_median)
-            return self.y_predicted_in_sample
+            return self.predicted
         else:
             print('predictions are made based on given new data')
             self._predict_out_of_sample(new_x=new_data, sample_size=sample_size, use_median=use_median)
             return self.y_predicted_out_of_sample
 
-
     def _predict_out_of_sample(self, new_x, sample_size=1000,  use_median=False):
-
         try:
             days = int(new_x.shape[1]/self.dim)
         except IndexError: #just 1d this case
@@ -305,13 +297,12 @@ class CarModel(BaseModel):
             return None
 
         with self.model:
-            simulated_values = pm.sample_ppc(self.trace)['Yi']
+            simulated_values = pm.sample_ppc(self.trace)['Y']
         self.y_predicted_out_of_sample = np.mean(simulated_values, axis=0)
         self.y_predicted_out_of_sample = self.y_predicted_out_of_sample[:, 0:days] #only first few column are relevant
 
 if __name__ == '__main__':
 
-    import pandas as pd
     from data_preprocessing_tools import transpose_dataframe, mark_flood_season
     from utility_functions import get_in_between_dates
 
@@ -334,11 +325,11 @@ if __name__ == '__main__':
     fall = df_sample_flat_wide[[i for i in df_sample_flat_wide.columns if i.startswith('FALL')]].values
 
     locations = df_sample_flat_wide.BASIN.values
-    covariate_m1 = rainfall
-    covariate_m2 = np.hstack([rainfall, elevations])
-    covariate_m3 = np.hstack([rainfall, elevations, spring, summer, fall])
-    covariate_m4 = np.hstack([rainfall, elevations, rainfall*elevations, spring, summer, fall])
-    covariate_m5 = np.hstack([rainfall, flood_season_indicator,flood_season_indicator*rainfall, elevations])
+    covariate_m1 = [rainfall]
+    covariate_m2 = [rainfall, elevations]
+    covariate_m3 = [rainfall, elevations, spring, summer, fall]
+    covariate_m4 = [rainfall, elevations, rainfall*elevations, spring, summer, fall]
+    covariate_m5 = [rainfall, flood_season_indicator,flood_season_indicator*rainfall, elevations]
 
     if False:
         m1 = CarModel(covariates=[rainfall, elevations],
@@ -346,13 +337,18 @@ if __name__ == '__main__':
                     response=gage_level)
         m1.fast_sample(iters=200)
         # m1._predict_in_sample()
+
     if True:
         m1 = CarModel(covariates=[rainfall, elevations],
-                     locations=locations,
-                    response=gage_level,
-                    autoreg=2)
-        m1.sample()
+                      locations=locations,
+                      response=gage_level,
+                      autoreg=2) #two terms of autoreg
+        m1.fast_sample(iters=10)
+        m1.predict()
+        m1.get_metrics()
         m1.get_parameter_estimation(['beta_0', 'beta_1', 'rho_1','rho_2'], 0.95)
+        m1.get_acf_and_pacf_by_region(figname='garbage')
+        m1.get_residual_plots_by_region(figname='garbage')
 
     if False:
         m2 = CarModel(covariates=covariate_m2,
