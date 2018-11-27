@@ -7,11 +7,10 @@ class SpatialDataLoader:
     this class directly. Use inherited class e.g. LoadFloodDaily instead
     '''
     def __init__(self, dataframe, variables, year, month, day=None):
-
         self.date = self._make_date(year, month, day)
         self.dataframe = dataframe
         self.daily_data = self.dataframe[self.dataframe.DATE.str.startswith(self.date)][variables]
-        self.sanity_check(self.daily_data)
+        self.throw_error_if_empty(self.daily_data)
 
     def _make_date(self, year, month, day):
         month = str(month).zfill(2)
@@ -33,7 +32,7 @@ class SpatialDataLoader:
         print('This is raw data and thus there might be missing values')
         print('-'*20)
 
-    def sanity_check(self, dataframe):
+    def throw_error_if_empty(self, dataframe):
         if dataframe.empty:
             print('Cannot find data for the give criteria')
             print('Please double check the date information you give')
@@ -56,7 +55,7 @@ class SpatialTemporalDataLoader:
         self.list_of_dates = get_in_between_dates(self.start, self.end)
         mask = dataframe.DATE.str.startswith(tuple(self.list_of_dates))
         self.daily_data = dataframe[mask][variables]
-        self.sanity_check(self.daily_data)
+        self.throw_error_if_empty(self.daily_data)
 
     def print_message(self, custom_message):
         print('-'*20)
@@ -68,7 +67,7 @@ class SpatialTemporalDataLoader:
         print('This is raw data and thus there might be missing values')
         print('-'*20)
 
-    def sanity_check(self, dataframe):
+    def throw_error_if_empty(self, dataframe):
         if dataframe.empty:
             print('Cannot find data for the give criteria')
             print('Please double check the date information you give')
@@ -83,7 +82,7 @@ class LoadFloodByDay(SpatialDataLoader):
 
     def __init__(self, year, month, day):
         dataframe = pd.read_csv('./data/check_out.csv', index_col=0, dtype={'SITENUMBER':str})
-        variables = ['SITENUMBER','LATITUDE','LONGITUDE','GAGE_MAX', 'ELEVATION', 'PRCP','HISTORICAL_MEDIAN_GAGE_MAX']
+        variables = ['SITENUMBER','LATITUDE','LONGITUDE','GAGE_MAX', 'ELEVATION', 'PRCP','HISTORICAL_MEDIAN_GAGE_MAX', 'BASIN']
         super().__init__(dataframe, variables, year, month, day)
 
     def load(self):
@@ -121,7 +120,7 @@ class LoadFloodByMonth(SpatialDataLoader):
     def __init__(self, year, month, day=None):
         dir_ = './data/check_out_monthly.csv'
         dataframe = pd.read_csv(dir_, index_col=0, dtype={'SITENUMBER': str})
-        variables = ['SITENUMBER','LATITUDE','LONGITUDE','GAGE_MAX', 'ELEVATION', 'PRCP','HISTORICAL_MEDIAN_GAGE_MAX']
+        variables = ['SITENUMBER','LATITUDE','LONGITUDE','GAGE_MAX', 'ELEVATION', 'PRCP','HISTORICAL_MEDIAN_GAGE_MAX', 'BASIN']
         super().__init__(dataframe, variables, year, month, day=None)
 
     def load(self):
