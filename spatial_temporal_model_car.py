@@ -16,7 +16,7 @@ class CarModel(BaseModel):
     '''
     Fit a conditional autoregressive model (spatial-temporal model)
     This may NOT work with spatial data (not tested for that case);
-    To fit spatial  model, use spatial_model module
+    To fit spatial model, use spatial_model module
     Args:
         response (np.array): 1-d array for response variable
         location_var: 1-d array to store location information
@@ -24,6 +24,8 @@ class CarModel(BaseModel):
     '''
     def __init__(self, response, locations, covariates=None, autoreg=1):
         super().__init__(response, locations, covariates)
+
+
 
         try:
             self.N = response.shape[0]
@@ -63,7 +65,7 @@ class CarModel(BaseModel):
         self.covariates = covariates_
         del covariates_
 
-        self.autoregressive_terms = []
+        self.shifted_response = []
 
         if autoreg: # redefine both x and y
             covariates_auto = [] #new X
@@ -74,8 +76,8 @@ class CarModel(BaseModel):
 
             for i in range(autoreg): #new Y_{t-1}
                 right = self.number_of_days - autoreg + i
-                make_autoreg_term = self.response[:, i:right]
-                self.autoregressive_terms.append(make_autoreg_term)
+                make_shifted_y = self.response[:, i:right]
+                self.shifted_response.append(make_shifted_y)
 
             self.response = self.response[:, autoreg:]
             self.number_of_days = self.number_of_days - autoreg
@@ -102,6 +104,7 @@ class CarModel(BaseModel):
 
         self.residuals = None
         self.residual_by_region = None #average over stations in that region; time series data
+        self.autoreg = autoreg
 
     def _get_weight_matrices(self):
         try:
@@ -138,20 +141,22 @@ class CarModel(BaseModel):
 
     def fit(self, sample_size=3000, sig=0.95):
 
+        self.locations = theano.shared(self.locations)
+
         with pm.Model() as self.model:
 
             # Priors for spatial random effects
             tau = pm.Gamma('tau', alpha=2., beta=2.)
             alpha = pm.Uniform('alpha', lower=0, upper=1)
-            phi = pm.MvNormal('phi',
+            self.phi = pm.MvNormal('phi',
                               mu=0,
                               tau=tau*(self.D - alpha*self.weight_matrix),
                               shape=(self.number_of_days, self.N) #30 x 94 sample size by dim
                               )
-            mu_ = phi.T
+            mu_ = self.phi.T
 
             if self.covariates: #add covars
-                beta_variables = []; beta_names = []
+                self.beta_variables = []; beta_names = []
                 cov_with_intercept = self.covariates.copy()
                 cov_with_intercept.append(self.intercepts)
 
@@ -160,19 +165,19 @@ class CarModel(BaseModel):
                     beta_var = pm.Normal(var_name, mu=0.0, tau=1.0)
 
                     beta_names.append(var_name)
-                    beta_variables.append(beta_var)
+                    self.beta_variables.append(beta_var)
                     mu_  = mu_ + beta_var*covariate
 
-            if self.autoregressive_terms: #add autoterms
-                rho_variables = []; rho_names =[]
-                autos = self.autoregressive_terms.copy()
+            if self.shifted_response: #add autoterms
+                self.rho_variables = []; rho_names =[]
+                autos = self.shifted_response.copy()
 
                 for idx, autoterm in enumerate(reversed(autos)):
                     var_name = '_'.join(['rho', str(idx+1)])
                     rho_var = pm.Normal(var_name, mu=0.0, tau=1.0)
 
                     rho_names.append(var_name)
-                    rho_variables.append(rho_var)
+                    self.rho_variables.append(rho_var)
                     mu_  = mu_ + rho_var*autoterm
             # Mean model
             theta_sd = pm.Gamma('theta_sd', alpha=1.0, beta=1.0)
@@ -260,46 +265,35 @@ class CarModel(BaseModel):
             self._predict_out_of_sample(new_x=new_data, sample_size=sample_size, use_median=use_median)
             return self.y_predicted_out_of_sample
 
-    def _predict_out_of_sample(self, new_x, sample_size=1000,  use_median=False):
-        try:
-            days = int(new_x.shape[1]/self.dim)
-        except IndexError: #just 1d this case
-            new_x = new_x[:, None]
-
-        if new_x.shape[1]%self.dim !=0:
-            print(f'the new data has {new_x.shape[1]} columns')
-            print(f'and there is {self.dim} variable')
-            print(f'trying to imply the number of days involved but {new_x.shape[1]} over {self.dim} is not an int')
-            raise ValueError('dimension mismatch: check the input dimension again')
-
-        if days < self.number_of_days:
-            print('automatically padding the input to match dim of original covariates.')
-            print('this is due to a design choice of pymc3; in general this should not concern user')
-
-            where_to_slice = [days*i for i in range(self.dim)]
-            where_to_slice.pop(0)
-            x_new_split = np.hsplit(new_x, where_to_slice)
-
-            x_new_list_ = []
-            for partial_data in x_new_split: #padding is required for all
-                extra_days = self.number_of_days - days
-                padded_values = np.random.standard_normal(self.N*extra_days).reshape(self.N, extra_days)
-                new_x_i = np.hstack([partial_data, padded_values])
-                x_new_list_.append(new_x_i)
-
-            new_x = np.hstack(x_new_list_) # dont need intercept
-            self.covariates.set_value(new_x)
-        elif days == self.number_of_days:
-            pass
-        else:
-            print('the days to predict is greater than the original dates. ')
-            print('this use case is not supported.')
-            return None
-
+    def _predict_out_of_sample(self, steps=1,
+       new_covariates=None, sample_size=1000, use_median=False):
+        '''
+        since autoregressive terms assumes yt = rho*yt-1, no new locations will be allowed.
+        '''
         with self.model:
-            simulated_values = pm.sample_ppc(self.trace)['Y']
-        self.y_predicted_out_of_sample = np.mean(simulated_values, axis=0)
-        self.y_predicted_out_of_sample = self.y_predicted_out_of_sample[:, 0:days] #only first few column are relevant
+            if self.covariates and new_covariates is None:
+                print('Must provide the covariates for day t+1')
+
+            new_mean_func = self.phi.T[:, -1]
+            if new_covariates:
+                intercepts = np.ones([self.N, 1]).ravel()
+                new_covariates.insert(0,intercepts)
+                for cov, beta in zip(new_covariates, self.beta_variables): #no equal lenght fix it
+                    new_mean_func = new_mean_func + cov*beta
+
+            index_to_slice = [i for i in range(self.response.shape[1])]
+            index_to_slice.pop(0)
+            sliced_response_var = np.hsplit(self.response, index_to_slice)
+
+            for i in range(self.autoreg):
+                recent_y_1d = sliced_response_var.pop()
+                new_mean_func += recent_y_1d.ravel()*self.rho_variables[i]
+
+            Y_new = pm.Deterministic('Y_new', new_mean_func)
+            simulated_values = pm.sample_ppc(self.trace, vars=[Y_new], samples=sample_size)['Y_new']
+            self.predicted_new = np.mean(simulated_values, axis=0)
+            return self.predicted_new
+
 
 if __name__ == '__main__':
 
@@ -339,17 +333,18 @@ if __name__ == '__main__':
         # m1._predict_in_sample()
 
     if True:
-        m1 = CarModel(covariates=[rainfall, elevations],
+        m1 = CarModel(covariates=[rainfall],
                       locations=locations,
                       response=gage_level,
-                      autoreg=2) #two terms of autoreg
+                      autoreg=1) #two terms of autoreg
         m1.fast_sample(iters=10)
-        m1.predict()
-        m1.get_metrics()
-        m1.get_parameter_estimation(['beta_0', 'beta_1', 'rho_1','rho_2'], 0.95)
-        m1.get_acf_and_pacf_by_region(figname='garbage')
-        m1.get_residual_plots_by_region(figname='garbage')
-
+        # m1.predict()
+        # m1.get_metrics()
+        # m1.get_parameter_estimation(['beta_0', 'beta_1', 'rho_1','rho_2'], 0.95)
+        # m1.get_acf_and_pacf_by_region(figname='garbage')
+        # m1.get_residual_plots_by_region(figname='garbage')
+        prediction = m1._predict_out_of_sample(new_covariates=[rainfall[:,1]])
+        print(prediction)
     if False:
         m2 = CarModel(covariates=covariate_m2,
                      locations=locations,
