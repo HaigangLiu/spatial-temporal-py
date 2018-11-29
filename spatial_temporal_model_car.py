@@ -46,10 +46,11 @@ class CarModel(BaseModel):
         self.shifted_response = []
         if autoreg: # redefine both x and y
             covariates_auto = [] #new X
-            for covariate in self.covariates:
-                covariate_remove_extra_days = covariate[:, autoreg:]
-                covariates_auto.append(covariate_remove_extra_days)
-            self.covariates = covariates_auto; del covariates_auto
+            if self.covariates:
+                for covariate in self.covariates:
+                    covariate_remove_extra_days = covariate[:, autoreg:]
+                    covariates_auto.append(covariate_remove_extra_days)
+                self.covariates = covariates_auto; del covariates_auto
 
             for i in range(autoreg): #new Y_{t-1}
                 right = self.number_of_days - autoreg + i
@@ -59,7 +60,6 @@ class CarModel(BaseModel):
             self.response = self.response[:, autoreg:]
             self.number_of_days = self.number_of_days - autoreg
             print(f'autoregressive term is {autoreg}, and first {autoreg} day(s) will be used as covariates')
-
 
         print('-'*40)
         print('BASIC INFO FROM INPUT')
@@ -142,10 +142,9 @@ class CarModel(BaseModel):
 
     def fit(self, sample_size=3000, sig=0.95):
 
-        self.locations = theano.shared(self.locations)
+        # self.locations = theano.shared(self.locations)
 
         with pm.Model() as self.model:
-
             # Priors for spatial random effects
             tau = pm.Gamma('tau', alpha=2., beta=2.)
             alpha = pm.Uniform('alpha', lower=0, upper=1)
@@ -188,7 +187,7 @@ class CarModel(BaseModel):
         we average over different locations and thus got time series data for each big region.
         '''
         if self.predicted is None:
-            _ = self._predict_in_sample(sample_size=5000, use_median=False)
+            _ = self._predict_in_sample(sample_size=1000, use_median=False)
 
         residuals = self.response - self.predicted
         resid_df = pd.DataFrame(residuals)
@@ -262,8 +261,7 @@ class CarModel(BaseModel):
             self._predict_out_of_sample(new_x=new_data, sample_size=sample_size, use_median=use_median)
             return self.predicted_new
 
-    def _predict_out_of_sample(self, steps=1,
-       new_covariates=None, sample_size=1000, use_median=False):
+    def _predict_out_of_sample(self, steps=1, new_covariates=None, sample_size=1000, use_median=False):
         '''
         make predictions for future dates
         Args:
@@ -273,32 +271,41 @@ class CarModel(BaseModel):
             use_median(boolean): if true, use median as point estimate otherwise mean will be used.
         '''
         if new_covariates:
-            new_covariates = CarModel._covariate_handler(new_covariates, steps)
-
-        if self.autoreg > 0:
-            _, y_most_recent = np.hsplit(self.response, [-self.autoreg])
-        else:
-            y_most_recent = None
-
-        if new_covariates:
-            if steps > 1:
-                x_split = []
-                x_by_date = []
-                for covariate_ndarray in new_covariates:
-                    x_split_one_var = np.hsplit(covariate_ndarray, [i for i in range(steps)])
-                    x_split_one_var.pop(0)
-                    x_split.append(x_split_one_var)
-
-                for day in range(steps):
-                    temp_var_one_day = []
-                    for covariate in x_split:
-                        temp_var_one_day.append(covariate[day])
-                    x_by_date.append(temp_var_one_day)
-                    del temp_var_one_day
+            if not self.covariates:
+                raise ValueError('No covariates in original model; thus they should not show up in prediction.')
+            else:
+                new_covariates = CarModel._covariate_handler(new_covariates, steps) #intercept added already
         else:
             if self.covariates:
                 raise ValueError('must provide covariates for new dates.')
-                return None
+            else:
+                new_covariates = []
+
+        if self.autoreg > 0:
+            _, y_temp = np.hsplit(self.response, [-self.autoreg])
+            last_ys = np.hsplit(y_temp, range(self.autoreg))
+            last_ys.pop(0)
+
+        else:
+            last_ys = None
+
+        if steps >1 and new_covariates:
+
+            x_split = []
+            for covariate_ndarray in new_covariates:
+                x_split_one_var = np.hsplit(covariate_ndarray, [i for i in range(steps)])
+                x_split_one_var.pop(0)
+                x_split.append(x_split_one_var)
+
+            x_by_date = [] # make a list of cov by dates
+            for day in range(steps):
+                temp_var_one_day = []
+                for covariate in x_split:
+                    temp_var_one_day.append(covariate[day])
+                x_by_date.append(temp_var_one_day)
+
+            del temp_var_one_day
+            del x_split
 
         def predict_one_step(current_x, last_y, name='Y_new'):
             '''
@@ -308,20 +315,13 @@ class CarModel(BaseModel):
             with self.model:
                 mean = self.phi.T[:, -1]
                 if current_x: # a list of vars
-                    if self.covariates:
-                        for cov_, beta in zip(current_x, self.beta_variables):
-                            mean = mean + cov_.ravel()*beta
-                    else:
-                        print('there is no covariates in original model.')
-                        print('hence, the covariates information given in prediction is ignored.')
-
-                if last_y is not None: #might be one, depends on autoreg
-                    for last_y_, rho in zip(last_y, self.rho_variables):
+                    for cov_, beta in zip(current_x, self.beta_variables):
+                        mean = mean + cov_.ravel()*beta
+                if last_ys is not None:
+                    for last_y_, rho in zip(last_ys, self.rho_variables):
                         mean = mean + last_y_.ravel()*rho
-
-                Y_most_recent = pm.Deterministic(name, mean)
-                svs = pm.sample_ppc(self.trace, vars=[Y_most_recent], samples=sample_size)[name]
-
+                y_temp = pm.Deterministic(name, mean)
+                svs = pm.sample_ppc(self.trace, vars=[y_temp], samples=sample_size)[name]
                 if use_median:
                     y = np.median(svs, axis=0)
                 else:
@@ -329,26 +329,25 @@ class CarModel(BaseModel):
             return y
 
         if steps == 1:
-            return predict_one_step(current_x=new_covariates, last_y=y_most_recent)
+            return predict_one_step(current_x=new_covariates, last_y=last_ys)
 
         elif steps > 1: #multipe steps
             y_history_rec = []
+            idx = 1
             while steps:
-                idx = 1
                 variable_name = '_'.join(['Y', str(idx)])
-
-                if self.covariates: # cov exists in model
+                if self.covariates:
                     current_x = x_by_date.pop()
                 else:
                     current_x = None
-
                 if self.autoreg > 0: #autoreg in model
-                    y_most_recent = predict_one_step(current_x, y_most_recent, variable_name)
+                    y_most_recent = predict_one_step(current_x, last_ys, variable_name)
+                    last_ys.append(y_most_recent)
+                    last_ys.pop(0)
                 else:
                     y_most_recent = predict_one_step(current_x, None, variable_name)
-
                 y_history_rec.append(y_most_recent)
-                steps += 1; idx -= 1
+                steps -= 1; idx += 1
             return np.array(y_history_rec)
         else:
             raise ValueError('steps has to be a positive integer!')
@@ -391,7 +390,7 @@ if __name__ == '__main__':
         # m1._predict_in_sample()
 
     if True:
-        m1 = CarModel(covariates=None,
+        m1 = CarModel(covariates=[rainfall],
                       locations=locations,
                       response=gage_level,
                       autoreg=1) #two terms of autoreg
@@ -401,7 +400,7 @@ if __name__ == '__main__':
         # m1.get_parameter_estimation(['beta_0', 'beta_1', 'rho_1','rho_2'], 0.95)
         # m1.get_acf_and_pacf_by_region(figname='garbage')
         # m1.get_residual_plots_by_region(figname='garbage')
-        prediction = m1._predict_out_of_sample(new_covariates=[rainfall[:, 200]], steps=1)
+        prediction = m1._predict_out_of_sample(new_covariates=[rainfall[:, 200:202]], steps=2)
         print(prediction)
     if False:
         m2 = CarModel(covariates=covariate_m2,
