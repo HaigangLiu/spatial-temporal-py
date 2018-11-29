@@ -1,8 +1,13 @@
-import os, re, tarfile, requests, fiona, shutil, numpy, secrets
-from datetime import datetime
+import os
+import re
+import tarfile
+import requests
+import fiona
+import shutil
+import numpy
+import secrets
 from multiprocessing import Pool, cpu_count
 from utility_functions import get_in_between_dates, get_state_grid_points
-import time
 
 class RainfallDownloaderByState:
     '''
@@ -14,7 +19,6 @@ class RainfallDownloaderByState:
         local_dir (string): the local dir to store data
         start (string): starting date: e.g. '1990-01-01'
         end (string): ending date: e.g. '1990-01-30'
-
         var_name (str, optional): the name of the variable of interest. NWS uses globvalue in general
         state_name (string, optional): the name of the state
             default value is 'south carolina'
@@ -179,13 +183,13 @@ class RainfallDownloaderByState:
 if __name__ == '__main__':
     #example_link
     #https://water.weather.gov/precip/archive/2014/01/01/nws_precip_1day_observed_shape_20140101.tar.gz
-    start = '2014-07-08'; end = '2014-08-08' #192 secs
+    start = '2005-01-01'; end = '2017-06-27' #takes 6497.7 sec
     full_length = get_in_between_dates(start, end)
     finished_list = []
     finished_list = RainfallDownloaderByState(start=start,
-                                                     end=end,
-                                                     maximum_tries=10,
-                                                     local_dir='./demo/',
-                                                     var_name='GLOBVALUE',
-                                                     state_name='South Carolina',
-                                                     fill_missing_locs=True).run(True)
+                                              end=end,
+                                              maximum_tries=10,
+                                              local_dir='./demo/',
+                                              var_name='GLOBVALUE',
+                                              state_name='New York',
+                                              fill_missing_locs=True).run(True)
