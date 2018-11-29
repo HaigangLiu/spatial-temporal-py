@@ -14,59 +14,36 @@ FAST_SAMPLE_ITERATION = 50 #advi setting
 
 class CarModel(BaseModel):
     '''
-    Fit a conditional autoregressive model (spatial-temporal model)
-    This may NOT work with spatial data (not tested for that case);
-    To fit spatial model, use spatial_model module
+    Fit a conditional autoregressive model (spatial-temporal model).
+    To fit a pure spatial model, use spatial_model module
     Args:
         response (np.array): 1-d array for response variable
         location_var: 1-d array to store location information
-        covariates: nd array to store covariates; a column of constants will be added automatically
+        covariates: nd array to store covariates;
+            intercepts will be generated automatically.
     '''
     def __init__(self, response, locations, covariates=None, autoreg=1):
         super().__init__(response, locations, covariates)
 
-
-
-        try:
-            self.N = response.shape[0]
-            self.number_of_days = response.shape[1]
-        except ValueError:
-            print('Reshape your data either using array.reshape(-1, 1) if you data has single feature')
-            return None
-
-        covariates = [] if covariates is None else covariates
+        assert response.ndim == 2, 'response should have 2 dimensions.'
+        assert response.shape[1] > 1, 'only one days is detected. Use spatial module instead.'
 
         if covariates:
-            if type(covariates) != list:
-                raise TypeError('covariates has to be a list of numpy array or NoneType by default')
+            assert type(covariates) == list, 'covariates has to be a list of numpy array'
             self.dim = len(covariates)
         else:
+            covariates = []
             self.dim = 0
 
-        if self.number_of_days <= 1:
-            raise ValueError('the data only contains one day. Use spatial module to avoid unexpected behavior')
+        self.N = response.shape[0]
+        self.number_of_days = response.shape[1]
 
-        covariates_ = [] #pure sanity check
-        for covariate in covariates:
-            try:
-                dim_cov = covariate.shape[1]
-            except ValueError: #shape like (28, )
-                covariate = np.tile(covariate[:, None], self.number_of_days)
-                dim_cov = covariate.shape[1]
-
-            if dim_cov == self.number_of_days:
-                pass
-            else:
-                print(covariate.shape[1])
-                print(self.number_of_days)
-                raise ValueError('the number of cols must be equal num of days or equal to 1')
-            covariates_.append(covariate)
-
-        self.covariates = covariates_
-        del covariates_
+        if covariates:
+            self.covariates = CarModel._covariate_handler(covariates, self.number_of_days)
+        else:
+            self.covariates = []
 
         self.shifted_response = []
-
         if autoreg: # redefine both x and y
             covariates_auto = [] #new X
             for covariate in self.covariates:
@@ -83,10 +60,6 @@ class CarModel(BaseModel):
             self.number_of_days = self.number_of_days - autoreg
             print(f'autoregressive term is {autoreg}, and first {autoreg} day(s) will be used as covariates')
 
-        if self.covariates:
-            self.intercepts = np.ones((self.N, self.number_of_days))
-        else:
-            self.intercepts = None
 
         print('-'*40)
         print('BASIC INFO FROM INPUT')
@@ -99,12 +72,40 @@ class CarModel(BaseModel):
         self.adjacent_matrix = None
         self._get_weight_matrices()
 
-        self.l1_loss = None
-        self.l2_loss = None
-
         self.residuals = None
         self.residual_by_region = None #average over stations in that region; time series data
         self.autoreg = autoreg
+
+    @staticmethod
+    def _covariate_handler(covariates, correct_dim):
+        '''
+        a helper function to make sure the dimension of input numpy arrays are correct
+        three situations are considered:
+         1. shape = (10, ): covert to (10, 1) then populate to (10,10)
+            where 10 is the proper dimension for example.
+        2. shape = (10 ,1), like first case, populate to (10, 10)
+        3. shape = (10, 9) raise ValueError since data type not understood.
+        '''
+        covariates_ = [] #pure sanity check
+        n = covariates[0].shape[0]
+
+        for covariate in covariates:
+            if n != covariate.shape[0]:
+                raise ValueError('the length of covariates are not equal')
+            if np.ndim(covariate) == 1:
+                covariate = np.tile(covariate[:, None], correct_dim)
+            elif np.ndim(covariate) == 2:
+                if covariate.shape[1] == correct_dim:
+                    pass
+                elif covariate.shape[1] == 1:
+                    covariate = np.tile(covariate, correct_dim)
+                else:
+                    raise ValueError(f'the proper dimension is {correct_dim}, get {covariate.shape[1]} instead')
+            else:
+                raise ValueError('dimension of covariates can only be either 1 or 2')
+            covariates_.append(covariate)
+            covariates_.append(np.ones((n, correct_dim)))
+        return covariates_
 
     def _get_weight_matrices(self):
         try:
@@ -157,13 +158,9 @@ class CarModel(BaseModel):
 
             if self.covariates: #add covars
                 self.beta_variables = []; beta_names = []
-                cov_with_intercept = self.covariates.copy()
-                cov_with_intercept.append(self.intercepts)
-
-                for idx, covariate in enumerate(cov_with_intercept):
+                for idx, covariate in enumerate(self.covariates):
                     var_name = '_'.join(['beta', str(idx)])
                     beta_var = pm.Normal(var_name, mu=0.0, tau=1.0)
-
                     beta_names.append(var_name)
                     self.beta_variables.append(beta_var)
                     mu_  = mu_ + beta_var*covariate
@@ -263,37 +260,98 @@ class CarModel(BaseModel):
         else:
             print('predictions are made based on given new data')
             self._predict_out_of_sample(new_x=new_data, sample_size=sample_size, use_median=use_median)
-            return self.y_predicted_out_of_sample
+            return self.predicted_new
 
     def _predict_out_of_sample(self, steps=1,
        new_covariates=None, sample_size=1000, use_median=False):
         '''
-        since autoregressive terms assumes yt = rho*yt-1, no new locations will be allowed.
+        make predictions for future dates
+        Args:
+            steps (int): how many days to forcast
+            new_covariates(list): a list of numpy arrays. The dimension should match number of days
+            sample_size (int): sample size of posterior sample
+            use_median(boolean): if true, use median as point estimate otherwise mean will be used.
         '''
-        with self.model:
-            if self.covariates and new_covariates is None:
-                print('Must provide the covariates for day t+1')
+        if new_covariates:
+            new_covariates = CarModel._covariate_handler(new_covariates, steps)
 
-            new_mean_func = self.phi.T[:, -1]
-            if new_covariates:
-                intercepts = np.ones([self.N, 1]).ravel()
-                new_covariates.insert(0,intercepts)
-                for cov, beta in zip(new_covariates, self.beta_variables): #no equal lenght fix it
-                    new_mean_func = new_mean_func + cov*beta
+        if self.autoreg > 0:
+            _, y_most_recent = np.hsplit(self.response, [-self.autoreg])
+        else:
+            y_most_recent = None
 
-            index_to_slice = [i for i in range(self.response.shape[1])]
-            index_to_slice.pop(0)
-            sliced_response_var = np.hsplit(self.response, index_to_slice)
+        if new_covariates:
+            if steps > 1:
+                x_split = []
+                x_by_date = []
+                for covariate_ndarray in new_covariates:
+                    x_split_one_var = np.hsplit(covariate_ndarray, [i for i in range(steps)])
+                    x_split_one_var.pop(0)
+                    x_split.append(x_split_one_var)
 
-            for i in range(self.autoreg):
-                recent_y_1d = sliced_response_var.pop()
-                new_mean_func += recent_y_1d.ravel()*self.rho_variables[i]
+                for day in range(steps):
+                    temp_var_one_day = []
+                    for covariate in x_split:
+                        temp_var_one_day.append(covariate[day])
+                    x_by_date.append(temp_var_one_day)
+                    del temp_var_one_day
+        else:
+            if self.covariates:
+                raise ValueError('must provide covariates for new dates.')
+                return None
 
-            Y_new = pm.Deterministic('Y_new', new_mean_func)
-            simulated_values = pm.sample_ppc(self.trace, vars=[Y_new], samples=sample_size)['Y_new']
-            self.predicted_new = np.mean(simulated_values, axis=0)
-            return self.predicted_new
+        def predict_one_step(current_x, last_y, name='Y_new'):
+            '''
+            the helper function to predit Yt+1
+            will be called iteratively to predict multiple days
+            '''
+            with self.model:
+                mean = self.phi.T[:, -1]
+                if current_x: # a list of vars
+                    if self.covariates:
+                        for cov_, beta in zip(current_x, self.beta_variables):
+                            mean = mean + cov_.ravel()*beta
+                    else:
+                        print('there is no covariates in original model.')
+                        print('hence, the covariates information given in prediction is ignored.')
 
+                if last_y is not None: #might be one, depends on autoreg
+                    for last_y_, rho in zip(last_y, self.rho_variables):
+                        mean = mean + last_y_.ravel()*rho
+
+                Y_most_recent = pm.Deterministic(name, mean)
+                svs = pm.sample_ppc(self.trace, vars=[Y_most_recent], samples=sample_size)[name]
+
+                if use_median:
+                    y = np.median(svs, axis=0)
+                else:
+                    y = np.mean(svs, axis=0)
+            return y
+
+        if steps == 1:
+            return predict_one_step(current_x=new_covariates, last_y=y_most_recent)
+
+        elif steps > 1: #multipe steps
+            y_history_rec = []
+            while steps:
+                idx = 1
+                variable_name = '_'.join(['Y', str(idx)])
+
+                if self.covariates: # cov exists in model
+                    current_x = x_by_date.pop()
+                else:
+                    current_x = None
+
+                if self.autoreg > 0: #autoreg in model
+                    y_most_recent = predict_one_step(current_x, y_most_recent, variable_name)
+                else:
+                    y_most_recent = predict_one_step(current_x, None, variable_name)
+
+                y_history_rec.append(y_most_recent)
+                steps += 1; idx -= 1
+            return np.array(y_history_rec)
+        else:
+            raise ValueError('steps has to be a positive integer!')
 
 if __name__ == '__main__':
 
@@ -333,7 +391,7 @@ if __name__ == '__main__':
         # m1._predict_in_sample()
 
     if True:
-        m1 = CarModel(covariates=[rainfall],
+        m1 = CarModel(covariates=None,
                       locations=locations,
                       response=gage_level,
                       autoreg=1) #two terms of autoreg
@@ -343,7 +401,7 @@ if __name__ == '__main__':
         # m1.get_parameter_estimation(['beta_0', 'beta_1', 'rho_1','rho_2'], 0.95)
         # m1.get_acf_and_pacf_by_region(figname='garbage')
         # m1.get_residual_plots_by_region(figname='garbage')
-        prediction = m1._predict_out_of_sample(new_covariates=[rainfall[:,1]])
+        prediction = m1._predict_out_of_sample(new_covariates=[rainfall[:, 200]], steps=1)
         print(prediction)
     if False:
         m2 = CarModel(covariates=covariate_m2,
