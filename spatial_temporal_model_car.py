@@ -185,10 +185,10 @@ class CarModel(BaseModel):
         if self.predicted is None:
             _ = self._predict_in_sample(sample_size=1000, use_median=False)
 
-        residuals = self.response - self.predicted
+        residuals = self.response - self.predicted #94*365
         resid_df = pd.DataFrame(residuals)
-        resid_df['watershed'] = self.locations
-        self.residual_by_region = resid_df.groupby('watershed').mean()
+        resid_df['watershed'] = self.locations #94, 366
+        self.residual_by_region = resid_df.groupby('watershed').mean() #8, 366
         return self.residual_by_region
 
     def get_residual_plots_by_region(self, figname=None, mode='time series', figsize_baseline=10):
@@ -203,7 +203,7 @@ class CarModel(BaseModel):
         residual_by_region = self.residual_by_region
 
         if mode == 'time series':
-            fig = residual_by_region.T.plot(figsize=[figsize_baseline,figsize_baseline], alpha=0.7)
+            fig = residual_by_region.T.plot(figsize=[figsize_baseline, figsize_baseline], alpha=0.7)
             fig  = fig.get_figure()
             figname_ = '_'.join([figname,'tsplot_for_resid.png']) if figname else 'tsplot_for_resid.png'
             fig.savefig(figname_)
@@ -220,31 +220,66 @@ class CarModel(BaseModel):
         print(f'the image file has been saved to {full_dir}')
         f = Image.open(full_dir).show()
 
-    def get_acf_and_pacf_by_region(self, figname=None, fig_size=15):
-
+    def acf_by_region(self, figname=None, width=15, height=15*2.5, open_after_done=True):
+        '''
+        plot autoregressive functions
+        '''
         if self.residual_by_region is None:
             _ = self.get_residual_by_region()
 
-        residual_by_region = self.residual_by_region
-        locs = list(set(self.locations))
+        if figname is None: #give a random name
+            from secrets import token_hex
+            random_token = token_hex(2)
+            identifier = 'acf'
+            name = identifier + random_token + '.png'
+        else:
+            name = figname
 
-        def _plot(figname, type_='acf'):
-            canvass = plt.figure(figsize=[fig_size, len(locs)*2.5])
-            for idx, loc in enumerate(locs):
-                plt.subplot(len(locs),1,idx + 1)
-                if type_ == 'acf':
-                    pd.Series(acf(residual_by_region.T[loc])).plot(kind='bar', color='lightblue')
-                else:
-                    pd.Series(pacf(residual_by_region.T[loc])).plot(kind='bar', color='lightblue')
-                plt.text(0.8,0.5, s=loc, horizontalalignment='left')
-            figname_base = 'acf.png' if type_=='acf' else 'pacf.png'
-            complete_name = '_'.join([figname, figname_base]) if  figname else figname_base
-            full_dir = os.path.join(os.getcwd(), complete_name)
-            canvass.savefig(full_dir)
+        self._plot_rows(self.residual_by_region, acf, name, width, height, open_after_done)
+
+    def pacf_by_region(self, figname=None, width=15, height=15*2.5, open_after_done=True):
+        '''
+        plot the partial autoregressive functions
+        '''
+        if self.residual_by_region is None:
+            _ = self.get_residual_by_region()
+
+        if figname is None:
+            from secrets import token_hex
+            random_token = token_hex(2)
+            identifier = 'pacf'
+            name = identifier + random_token + '.png'
+        else:
+            name = figname
+        self._plot_rows(self.residual_by_region, pacf, name, width, height, open_after_done)
+
+    def _plot_rows(self, dataframe, transformation, figname, width, height, open_after_done):
+        '''
+        internal utility function:
+        plot rows in pandas dataframe individually
+        allow transformation before plotting.
+        allow differing length of data after transformation
+        '''
+        canvass_for_all = plt.figure(figsize=[width, height])
+        columns = dataframe.columns.tolist()
+        num_of_figs = len(columns)
+
+        for idx, arrays in enumerate(dataframe.values):
+            graph_name = str(columns.pop(0))
+            plt.subplot(num_of_figs, 1, idx+1)
+            if transformation:
+                tranformed_data = transformation(arrays)
+            else:
+                tranformed_data = arrays
+            pd.Series(tranformed_data).plot(kind='bar', color='lightblue')
+            plt.text(0.8,0.5, s=graph_name, horizontalalignment='left')
+
+        full_dir = os.path.join(os.getcwd(), figname)
+        canvass_for_all.savefig(full_dir)
+        if open_after_done:
             f = Image.open(full_dir).show()
 
-        _plot(figname, type_='acf')
-        _plot(figname, type_='pacf')
+        print(f'the graph has been {figname} has been saved to {full_dir}')
 
     def predict(self, new_data=None, sample_size=1000, use_median=False):
         '''if there is no new data given, assume in-sample prediction. otherwise do it for new_x'''
@@ -391,13 +426,15 @@ if __name__ == '__main__':
                       response=gage_level,
                       autoreg=1) #two terms of autoreg
         m1.fast_sample(iters=10)
+        m1.acf_by_region()
+        m1.pacf_by_region()
         # m1.predict()
         # m1.get_metrics()
         # m1.get_parameter_estimation(['beta_0', 'beta_1', 'rho_1','rho_2'], 0.95)
         # m1.get_acf_and_pacf_by_region(figname='garbage')
         # m1.get_residual_plots_by_region(figname='garbage')
-        prediction = m1._predict_out_of_sample(new_covariates=[rainfall[:, 200:202]], steps=2)
-        print(prediction)
+        # prediction = m1._predict_out_of_sample(new_covariates=[rainfall[:, 200:202]], steps=2)
+        # print(prediction)
     if False:
         m2 = CarModel(covariates=covariate_m2,
                      locations=locations,
