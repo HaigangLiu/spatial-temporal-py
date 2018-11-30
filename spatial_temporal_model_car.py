@@ -142,8 +142,6 @@ class CarModel(BaseModel):
 
     def fit(self, sample_size=3000, sig=0.95):
 
-        # self.locations = theano.shared(self.locations)
-
         with pm.Model() as self.model:
             # Priors for spatial random effects
             tau = pm.Gamma('tau', alpha=2., beta=2.)
@@ -151,7 +149,7 @@ class CarModel(BaseModel):
             self.phi = pm.MvNormal('phi',
                               mu=0,
                               tau=tau*(self.D - alpha*self.weight_matrix),
-                              shape=(self.number_of_days, self.N) #30 x 94 sample size by dim
+                              shape=(self.number_of_days, self.N) #the second dim has covar structure
                               )
             mu_ = self.phi.T
 
@@ -170,14 +168,12 @@ class CarModel(BaseModel):
 
                 for idx, autoterm in enumerate(reversed(autos)):
                     var_name = '_'.join(['rho', str(idx+1)])
-                    rho_var = pm.Normal(var_name, mu=0.0, tau=1.0)
-
+                    rho_var = pm.Uniform(var_name, lower=0, upper=1)
                     rho_names.append(var_name)
                     self.rho_variables.append(rho_var)
                     mu_  = mu_ + rho_var*autoterm
-            # Mean model
+
             theta_sd = pm.Gamma('theta_sd', alpha=1.0, beta=1.0)
-            # Likelihood
             Y = pm.Normal('Y', mu=mu_, tau=theta_sd, observed=self.response)
 
     def get_residual_by_region(self):
@@ -384,8 +380,8 @@ if __name__ == '__main__':
 
     if False:
         m1 = CarModel(covariates=[rainfall, elevations],
-                     locations=locations,
-                    response=gage_level)
+                      locations=locations,
+                      response=gage_level)
         m1.fast_sample(iters=200)
         # m1._predict_in_sample()
 
