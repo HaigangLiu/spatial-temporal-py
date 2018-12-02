@@ -361,19 +361,53 @@ def mark_flood_season(original_df, start, end, time_col='DATE'):
     '''
     flood_season_dates = get_in_between_dates(start, end)
     indicators = []
-    for date_ in original_df[time_col].isin(list_of_dates):
+    for date_ in original_df[time_col].isin(flood_season_dates):
         if date_:
-            booleans.append(1)
+            indicators.append(1)
         else:
-            booleans.append(0)
+            indicators.append(0)
     original_df['FLOOD_SEASON'] = np.array(indicators)
     return original_df
+
+def get_autoregressive_terms(dataframe, steps=1, groupby='SITENUMBER', date_col='DATE', variable='DEV_GAGE_MAX'):
+
+    '''
+    simple add np.nan in the first position, and shift everyone back a slot
+    This is complicated by the existence of multiple stations.
+    Hence, we have to group by sitenumber, and for each set do the aforementioned operations.
+
+    dataframe(pandas dataframe): a spatial temporal dataframe
+    steps(int): the number of autoreg term to be generated (default is 1)
+    groupby(str): the location/site identifier column. Each station/site should have its own time series default value (groupby)
+    date_col(str): the name of the time information column; defaul value 'DATE'
+    variable(str): the name of the target column; default value 'DEV_GAGE_MAX'
+    '''
+    variable_names = (variable + '_MINUS_' + str(step+1) for step in range(steps))
+    groups = dataframe[groupby].unique().tolist()
+
+    modified_df = dataframe.copy()
+    modified_df.set_index(groupby, inplace=True)
+    df_reconstructed = []
+
+    for single_group in groups:
+        per_site = modified_df.loc[single_group]
+        for step, variable_name in zip(range(steps), variable_names):
+            null_part = np.array([np.nan]*(step+1))
+            per_site.loc[single_group, variable_name] = np.append(null_part, per_site[variable][0:-((step+1))])
+            df_reconstructed.append(per_site)
+
+    df_output = pd.concat(df_reconstructed, axis=0)
+    return df_output.reset_index(drop=False)
+
 
 if __name__ == '__main__':
 
     # raw_df = pd.read_csv('./data/rainfall_and_flood_10_beta.csv', index_col=0, dtype={'SITENUMBER': str})
 
     checkout_df = pd.read_csv('./data/check_out.csv', dtype={'SITENUMBER': str}, index_col=0)
+    checkout_df = mark_flood_season(checkout_df, start='2015-10-01',
+        end='2015-12-31')
+
     ss = transpose_dataframe(checkout_df, start='2010-01-01', end='2010-01-02')
 
     print(get_elevation([ -80.03, 33]))
@@ -396,5 +430,5 @@ if __name__ == '__main__':
     raw_df = get_elevation(raw_df) #0.7
     raw_df = get_watershed(raw_df) #0.5
     raw_df = get_basin_from_watershed(raw_df) #0.1
+    raw_df = get_autoregressive_terms(raw_df, steps=2)
     raw_df.to_csv('./data/check_out.csv') #13.6 -> 6.3
-
