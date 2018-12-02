@@ -83,9 +83,9 @@ class LinearModel(ModelBuilder):
     x_categorical(list): name(s) of columns of covariates that are categorical
     '''
     def build(self,**kwargs):
-    '''
-    all kwargs in LinearRegression i.e., fit_intercept, are also allowed
-    '''
+        '''
+        all kwargs in LinearRegression i.e., fit_intercept, are also allowed
+        '''
         return super().build(LinearRegression(**kwargs))
 
 class BoostingModel(ModelBuilder):
@@ -109,39 +109,39 @@ class RandomForestModel(ModelBuilder):
     x_categorical(list): name(s) of columns of covariates that are categorical
     '''
     def build(self,**kwargs):
-    '''
-    all kwargs in RandomForestRegressor i.e., n_estimators, are also allowed
-    '''
+        '''
+        all kwargs in RandomForestRegressor i.e., n_estimators, are also allowed
+        '''
         return super().build(RandomForestRegressor(**kwargs))
 
 if __name__ == '__main__':
     import pandas as pd
     checkout_df = pd.read_csv('./data/check_out.csv', dtype={'SITENUMBER': str}, index_col=0)
-    data_all = checkout_df[['DATE','DEV_GAGE_MAX','PRCP', 'BASIN', 'FALL', 'SPRING', 'SUMMER','FLOOD_SEASON']]
+    data_all = checkout_df[['DATE','DEV_GAGE_MAX','PRCP', 'BASIN', 'FALL',
+    'SPRING', 'SUMMER','FLOOD_SEASON', 'DEV_GAGE_MAX_MINUS_1']]
     train = data_all[ (data_all.DATE >= '2015-01-01') & (data_all.DATE <= '2015-12-26')]
     test = data_all[ (data_all.DATE >= '2015-12-27') & (data_all.DATE <= '2015-12-31')]
 
     if True:
         m1 = RandomForestModel(train, ['DEV_GAGE_MAX'], ['PRCP', 'FALL', 'SPRING',
-            'SUMMER','FLOOD_SEASON'], ['BASIN'])
+            'SUMMER','FLOOD_SEASON','DEV_GAGE_MAX_MINUS_1'], ['BASIN'])
         m1.build(n_estimators=20)
-        predicted = m1.predict(test[['PRCP', 'FALL', 'SPRING',
-            'SUMMER','FLOOD_SEASON', 'BASIN']])
+        predicted = m1.predict(test[['PRCP', 'FALL',
+            'SPRING','SUMMER','FLOOD_SEASON', 'DEV_GAGE_MAX_MINUS_1', 'BASIN']])
         m1.report(test['DEV_GAGE_MAX'].values, predicted)
 
     if True:
         m2 = LinearModel(train, ['DEV_GAGE_MAX'], ['PRCP', 'FALL', 'SPRING',
-            'SUMMER','FLOOD_SEASON'], ['BASIN'])
+            'SUMMER','FLOOD_SEASON', 'DEV_GAGE_MAX_MINUS_1'], ['BASIN'])
         m2.build()
         predicted = m2.predict(test[['PRCP', 'FALL', 'SPRING',
-            'SUMMER','FLOOD_SEASON', 'BASIN']])
+            'SUMMER','FLOOD_SEASON', 'DEV_GAGE_MAX_MINUS_1','BASIN']])
         m2.report(test['DEV_GAGE_MAX'].values, predicted)
 
     if True:
         m3 = BoostingModel(train, ['DEV_GAGE_MAX'], ['PRCP', 'FALL', 'SPRING',
-            'SUMMER','FLOOD_SEASON'], ['BASIN'])
+            'SUMMER','FLOOD_SEASON', 'DEV_GAGE_MAX_MINUS_1'], ['BASIN'])
         m3.build()
         predicted = m3.predict(test[['PRCP', 'FALL', 'SPRING',
-            'SUMMER','FLOOD_SEASON', 'BASIN']])
+            'SUMMER','FLOOD_SEASON', 'DEV_GAGE_MAX_MINUS_1','BASIN']])
         m3.report(test['DEV_GAGE_MAX'].values, predicted)
-
