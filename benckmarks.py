@@ -1,4 +1,3 @@
-
 from sklearn.pipeline import Pipeline
 from sklearn.impute import SimpleImputer
 from sklearn.preprocessing import StandardScaler, OneHotEncoder
@@ -8,7 +7,12 @@ from sklearn.linear_model import LinearRegression
 from sklearn.metrics import r2_score, mean_squared_error, mean_absolute_error
 
 class ModelBuilder:
+    '''
+    a simple extension from sklean models
+    used as benckmarks to compare with car models
 
+    Base Model; not intended for end users to call
+    '''
     def __init__(self, train_df, y, x_numeric, x_categorical):
 
         self.x_numeric = x_numeric
@@ -73,23 +77,41 @@ class ModelBuilder:
 
 class LinearModel(ModelBuilder):
     '''
-    all kwargs in LinearRegression i.e., fit_intercept, are also allowed
+    train_df: (pandas dataframe)
+    y (string): name of column of response variable
+    x_numeric (list): name(s) of column of covariates that are numeric
+    x_categorical(list): name(s) of columns of covariates that are categorical
     '''
     def build(self,**kwargs):
+    '''
+    all kwargs in LinearRegression i.e., fit_intercept, are also allowed
+    '''
         return super().build(LinearRegression(**kwargs))
 
 class BoostingModel(ModelBuilder):
     '''
-    all kwargs in AdaBoostRegressor i.e., random_state, are also allowed
+    train_df: (pandas dataframe)
+    y (string): name of column of response variable
+    x_numeric (list): name(s) of column of covariates that are numeric
+    x_categorical(list): name(s) of columns of covariates that are categorical
     '''
     def build(self,**kwargs):
+        '''
+        all kwargs in AdaBoostRegressor i.e., random_state, are also allowed
+        '''
         return super().build(AdaBoostRegressor(**kwargs))
 
 class RandomForestModel(ModelBuilder):
     '''
-    all kwargs in RandomForestRegressor i.e., n_estimators, are also allowed
+    train_df: (pandas dataframe)
+    y (string): name of column of response variable
+    x_numeric (list): name(s) of column of covariates that are numeric
+    x_categorical(list): name(s) of columns of covariates that are categorical
     '''
     def build(self,**kwargs):
+    '''
+    all kwargs in RandomForestRegressor i.e., n_estimators, are also allowed
+    '''
         return super().build(RandomForestRegressor(**kwargs))
 
 if __name__ == '__main__':
