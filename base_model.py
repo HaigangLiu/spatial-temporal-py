@@ -2,11 +2,8 @@ import pymc3 as pm
 import numpy as np
 
 class BaseModel:
-
     def __init__(self, response, locations, covariates=None):
-        '''
-        Users can pass however many covariates, or no covariates at all.
-        '''
+
         self.response = response
         self.locations = locations
         self.covariates = covariates
@@ -53,10 +50,10 @@ class BaseModel:
             return None
         return cls(reponse, locations, covariates_numpy)
 
-    def get_metrics(self):
+    def get_metrics(self, sample_size=5000):
 
         if self.predicted is None:
-            self._predict_in_sample(sample_size=5000, use_median=False)
+            self._predict_in_sample(sample_size=sample_size, use_median=False)
 
         waic = pm.waic(self.trace, self.model).WAIC
         loo = pm.loo(self.trace, self.model).LOO
@@ -80,8 +77,7 @@ class BaseModel:
 
         with self.model:
             start = pm.find_MAP()
-            self.trace = pm.sample(sampling_size, tune=burn_in,
-                nchains=nchains)
+            self.trace = pm.sample(sample_size, tune=burn_in, nchains=nchains)
 
     def fast_sample(self, sample_size=5000, iters=10000):
         if self.model is None:
@@ -149,7 +145,6 @@ class BaseModel:
                 mean = str(round(mean, 4))
                 lower_bound = str(round(lower_bound, 4))
                 upper_bound = str(round(upper_bound, 4))
-
                 temp.append([mean, lower_bound, upper_bound, conclusion])
 
             if len(temp) == 1:
@@ -174,6 +169,11 @@ class BaseModel:
 
     @staticmethod
     def pretty_print(header, table_to_print, table_len=80):
+        '''
+        header (string): header of table
+        table_to_print (list of list): every list is a row.
+            list element has to be string
+        '''
         print('-'*table_len)
         print(header)
         col_width = max(len(word) for row in table_to_print for word in row) + 2  # padding
