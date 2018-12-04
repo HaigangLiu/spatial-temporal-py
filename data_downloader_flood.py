@@ -24,6 +24,7 @@ class DailyFloodDataDownloader:
             eight_digit_station_only (boolean): if true, only use stream station and discard other stations which might be irrelelavent
             verbose (boolean): if true, more information will be given when downloading. Otherwise only progress will be reported.
             cap (int) for demo purpose, we can limit the number of locations
+
         Example:
             >>test = DailyFloodDataDownloader(start='2010-01-01', end='2010-01-02', state='SC')
             >>test.run()
@@ -231,7 +232,7 @@ class DailyFloodDataDownloader:
         print(f'the location of file is {os.getcwd()}')
 
 if __name__ == '__main__':
-    test = DailyFloodDataDownloader(start='2010-01-01', end='2016-12-31', state='SC', cap=None, eight_digit_station_only=True)
+    test = DailyFloodDataDownloader(start='2010-01-01', end='2016-12-31', state='SC', cap=None, eight_digit_station_only=False)
     test.run()
 
     # https://waterdata.usgs.gov/nwis/dv?cb_00065=on&format=rdb&site_no=02153051&referred_module=sw&period=&begin_date=2017-11-20&end_date=2018-11-20
