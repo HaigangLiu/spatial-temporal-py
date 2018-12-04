@@ -1,14 +1,9 @@
-import os
 import requests
-import pandas as pd
-from shutil import rmtree
 from utility_functions import get_state_fullname
-
-ATTRIBUTE_NUMBER = {'GAGE': '00065'}  #gage level
-STAT_IDENTIFIER = {'MAX': '00001', 'MIN':'00002','MEAN':'00003'} #max, min, mean
+from collections import defaultdict
 
 class DailyFloodDataDownloader:
-    def __init__(self, start, end, state, eight_digit_station_only=True, cap=None, verbose=False):
+    def __init__(self, start, end, state, eight_digit_station_only=True, cap=None, verbose=False, filename=None, attr_code='00065', header=None):
         '''
         download flood data for given state within a given time frame
         1. first go to nws website to grab a list of available stations in that area
@@ -29,15 +24,18 @@ class DailyFloodDataDownloader:
             >>test = DailyFloodDataDownloader(start='2010-01-01', end='2010-01-02', state='SC')
             >>test.run()
         '''
-        self.state = state if len(state) == 2 else get_state_fullname(state,
-            reverse=True)
+        self.state = state if len(state) == 2 else get_state_fullname(state, reverse=True)
         self.verbose =verbose
         self.cap = cap
         self.job_list = []
-        self.filename = self._make_filename(start=start, end=end, state=self.state)
 
-        var_code = ATTRIBUTE_NUMBER['GAGE']
-        _url_part_1 = f'https://waterdata.usgs.gov/nwis/dv?cb_{var_code}=on&format=rdb&site_no='
+        if filename is None:
+            self.filename = self._make_filename(start=start, end=end, state=self.state)
+        else:
+            self.filename = filename
+
+        attr_code = str(attr_code)
+        _url_part_1 = f'https://waterdata.usgs.gov/nwis/dv?cb_{attr_code}=on&format=rdb&site_no='
         _url_part_2 = f'&referred_module=sw&period=&begin_date={start}&end_date={end}'
 
         print('-'*40)
@@ -63,10 +61,9 @@ class DailyFloodDataDownloader:
             job = _url_part_1 + str(station) + _url_part_2
             self.job_list.append(job)
 
-        self.temp_dir = os.path.join(os.getcwd(), 'temp_dir_flood')
-        if not os.path.exists(self.temp_dir):
-            os.mkdir(self.temp_dir)
-        self.colnames_table = self.make_header()
+        self.header = None #user can customize it
+        if attr_code != '00065' and self.header is None:
+            raise ValueError(f'a different attribute code detected: {attr_code}. You should  assign a corresponding header as well.')
 
     def _make_filename(self, start, end, state):
         start_ = ''.join(start.split('-'))
@@ -97,18 +94,15 @@ class DailyFloodDataDownloader:
             return shorter_dict
         return dict_of_stations
 
-    def page_parser(self, station_url, additional_info, outfilename):
+    def page_parser(self, station_url, additional_info=None):
         '''
-        parse the url and save the result in a txt file
+        parse the url and save the result into a default dict
         allow users to add additional information like latitude and longitude
         the additional information has to be a dict
 
         Note that if the file has 2 lines, the additional info will be
         appended to each of them.
         '''
-        keywords = '\t'.join(list(additional_info.keys()))
-        values = '\t'.join(list(additional_info.values()))
-
         try:
             content = requests.get(station_url).text
         except requests.exceptions.SSLError:
@@ -116,123 +110,136 @@ class DailyFloodDataDownloader:
                 print('encountered a bad connection, will pass this one')
             return None
 
-        obs = []; header = None
-
-        if content is None:
+        if content:
+            content = content.split('\n')
+        else:
             print(f'Got an empty page')
             return None
 
-        textfile_name = '.'.join([outfilename, 'txt'])
-        textfile_name = os.path.join(self.temp_dir, textfile_name)
+        output_dict = defaultdict(list)
+        counter_num_days = 0
+        header_not_set = True
+        keys = None
 
-        with open(textfile_name, 'w') as f:
-            for line in content.split('\n'):
-                is_obs = line.startswith('USGS')
-                is_var_name = line.startswith('agency_cd')
+        while content:
+            line = content.pop(0)
+            if header_not_set and line.startswith('agency_cd'):
+                keys = line.split('\t')
+                for key in keys:
+                    output_dict[key]  #initialize
+                header_not_set = False #only check once
 
-                if is_var_name:
-                    line = '\t'.join([keywords, line])
-                    f.write(line+'\n')
+            elif line.startswith('USGS'):
+                if keys:
+                    values = line.split('\t')
+                    for key, value in zip(keys, values):
+                        output_dict[key].append(value)
+                    counter_num_days += 1
+                else:
+                    raise ValueError('content comes before header. Should not happen')
+            else:
+                pass
 
-                if is_obs:
-                    line = '\t'.join([values, line])
-                    f.write(line+'\n')
-
-        if os.path.getsize(textfile_name):
-            if self.verbose:
-                print('file downloading finished')
-            return textfile_name
+        if counter_num_days:
+            print(f'found {counter_num_days} days')
+            if additional_info:
+                for key, value in additional_info.items():
+                    value_ = [value]*counter_num_days
+                    output_dict[key].extend(value_)
+            return output_dict
         else:
             if self.verbose:
                 print('no valid data found')
-            os.remove(textfile_name)
             return None
 
-    def make_header(self):
-        look_up_table = {} # for renaming scheme
-        for att_num in  ATTRIBUTE_NUMBER.items():
-            for stat in STAT_IDENTIFIER.items():
-                k1, v1 = att_num
-                k2, v2 = stat
-                new_key = ('_'.join([k1, k2]))
-                new_v = ('_'.join([v1, v2]))
-                look_up_table[new_key] = new_v
-
-        header = {'SITENUMBER': 'site_no',
-                  'STATIONNAME': 'name',
-                  'LATITUDE':'latitude',
-                  'LONGITUDE': 'longitude',
-                  'DATE':'datetime',
-                  }
-                #'gage_max': '--006450--001'
-        header.update(look_up_table)
-        return header
-
-    def file_formatter(self, filename, format_dict):
+    def file_formatter(self, result_dict, formatter):
         '''
-        format_dict gives the instruction of how to rename file
-        renaming several variables and remove duplicate columns
+        match differet web page dynamically
+        only need target data column name to match tails (endswith)
+        return a one to many dict
         '''
-        look_up_table = format_dict
-        reversed_table = {v: k for k, v in look_up_table.items()}
-        dataframe = pd.read_csv(filename, sep='\t', dtype={'site_no':str})
+        translated_header = defaultdict(list) #different for each file
+        for key in result_dict.keys():
+            for k, v in formatter.items():
+                if key.endswith(k):
+                    translated_header[v].append(key)
 
-        for col in dataframe.columns:
-            if not col.endswith(tuple(list(look_up_table.values()))):
-                dataframe.drop([col], axis=1, inplace=True)
+        formatted_dict = defaultdict(list)
+        for key in translated_header.keys():
+            values = translated_header[key]
+
+            if len(values) >= 2:
+                pooled_list = [] #only record the first viable value
+                multiple_cols = [result_dict[value] for value in values]
+                for entry in zip(*multiple_cols): #[1,2,3]
+                    for val in entry:
+                        if val:
+                            pooled_list.append(val)
+                            break
+                    else:
+                        pooled_list.append('-9999')
+
+                formatted_dict[key].extend(pooled_list)
+            elif len(values) == 1:
+                formatted_dict[key].extend(result_dict[values[0]])
             else:
-                try:
-                    new_name = reversed_table[col]
-                except KeyError:
-                    list_of_keys = list(reversed_table.keys())
-                    right_key = list(filter(col.endswith, list_of_keys))[0]
-                    new_name = reversed_table[right_key]
+                assert False, 'should not happen'
+        return formatted_dict
 
-                dataframe.rename(columns={col: new_name}, inplace=True)
-        dataframe.to_csv(filename, index=False)
+    def make_header(self):
+        if self.header is None: #default ones
+            header = {'STATIONNAME': 'name',
+                      'LATITUDE':'latitude',
+                      'LONGITUDE': 'longitude',
+                      'SITENUMBER': 'site_no',
+                      'DATE':'datetime',
+                      'GAGE_MAX': '00065_00001',
+                      'GAGE_MIN': '00065_00002',
+                      'GAGE_MEAN': '00065_00003'}
+            self.header = {v: k for k, v in header.items()}
+        return self.header
 
     def run(self):
 
         valid_station = 0
+        if self.header is None:
+            self.make_header()
 
-        for idx, (stationurl, stationid) in enumerate(zip(self.job_list, self.stations)):
-            name, latitude, longitude = self.station_info_dict[stationid]
-            additional_info_dict = {'name': name, 'latitude': latitude, 'longitude': longitude}
-            filename = self.page_parser(station_url=stationurl,
-                                        additional_info=additional_info_dict,
-                                        outfilename=stationid)
-
-            if filename:
-                self.file_formatter(filename, self.colnames_table)
-                valid_station = valid_station + 1
-            if idx%10 == 0: #progress tracker reported every 10 station
-                if self.cap:
-                    print(f'number of stations processed: {idx}; number of stations valid: {valid_station}')
-                    print(f'progress: {valid_station}/{self.cap}')
-                else:
-                    print(f'number of stations processed: {idx}; number of stations valid: {valid_station}')
-                    print(f'progress {idx}/{len(self.job_list)}')
-
-            if self.cap and valid_station >= self.cap:
-                print(f'found {self.cap} stations already. teminating the program')
-                break
-
+        no_header_written = True
         with open(self.filename, 'w') as file:
-            header = ','.join(list(self.colnames_table.keys())) + '\n'
-            file.write(header)
-            for small_file in os.listdir(self.temp_dir):
-                path_to_small_file = os.path.join(self.temp_dir, small_file)
-                if path_to_small_file.endswith('.txt') and os.path.getsize(path_to_small_file):
-                    with open(path_to_small_file) as sf:
-                        next(sf)
-                        file.write(sf.read())
+            for idx, (stationurl, stationid) in enumerate(zip(self.job_list, self.stations)):
 
-        rmtree(self.temp_dir) #tear down
-        print(f'the data have have been saved into the file {self.filename}.')
-        print(f'the location of file is {os.getcwd()}')
+                name, latitude, longitude = self.station_info_dict[stationid]
+                additional_info_dict = {'name': name, 'latitude': latitude, 'longitude': longitude}
+                file_dict = self.page_parser(station_url=stationurl,
+                                             additional_info=additional_info_dict)
+                if file_dict:
+                    file_dict = self.file_formatter(file_dict, self.header)
+                    valid_station = valid_station + 1
+
+                if idx%10 == 0: #progress tracker reported every 10 station
+                    if self.cap:
+                        print(f'number of stations processed: {idx}; number of stations valid: {valid_station}')
+                        print(f'progress: {valid_station}/{self.cap}')
+                    else:
+                        print(f'number of stations processed: {idx}; number of stations valid: {valid_station}')
+                        print(f'progress {idx}/{len(self.job_list)}')
+
+                if file_dict:
+                    if no_header_written:
+                        header = '\t'.join(list(file_dict.keys()))
+                        file.write(header+'\n')
+                        no_header_written = False
+
+                    for value in zip(*file_dict.values()):
+                        file.write('\t'.join(value) + '\n')
+
+                if self.cap and valid_station >= self.cap + 1:
+                    print(f'found {self.cap} stations already. teminating the program')
+                    break
 
 if __name__ == '__main__':
-    test = DailyFloodDataDownloader(start='2010-01-01', end='2016-12-31', state='SC', cap=None, eight_digit_station_only=False)
-    test.run()
+    test = DailyFloodDataDownloader(start='2010-01-01', end='2016-12-31', state='SC', cap=300, eight_digit_station_only=True, filename='amlaFinal.txt')
+    s = test.run()
 
     # https://waterdata.usgs.gov/nwis/dv?cb_00065=on&format=rdb&site_no=02153051&referred_module=sw&period=&begin_date=2017-11-20&end_date=2018-11-20
