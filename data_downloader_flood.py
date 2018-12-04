@@ -3,6 +3,7 @@ from utility_functions import get_state_fullname
 from collections import defaultdict
 
 class DailyFloodDataDownloader:
+
     def __init__(self, start, end, state, eight_digit_station_only=True, cap=None, verbose=False, filename=None, attr_code='00065', header=None):
         '''
         download flood data for given state within a given time frame
@@ -48,7 +49,7 @@ class DailyFloodDataDownloader:
             print('this might make the process longer.')
             print('please turn this off by eight_digit_station_only=True unless you have reason to do otherwise')
 
-        self.station_info_dict = self._get_stations(self.state, eight_digit_station_only=eight_digit_station_only)
+        self.station_info_dict = self.get_stations(self.state, eight_digit_station_only=eight_digit_station_only)
         self.stations = list(self.station_info_dict.keys())
 
         print('finished generating locations, now start downloading files.')
@@ -71,7 +72,20 @@ class DailyFloodDataDownloader:
         name = '-'.join([state, start_, end_])
         return name + '.txt'
 
-    def _get_stations(self, state, eight_digit_station_only):
+    def make_header(self):
+        if self.header is None: #default ones
+            header = {'STATIONNAME': 'name',
+                      'LATITUDE':'latitude',
+                      'LONGITUDE': 'longitude',
+                      'SITENUMBER': 'site_no',
+                      'DATE':'datetime',
+                      'GAGE_MAX': '00065_00001',
+                      'GAGE_MIN': '00065_00002',
+                      'GAGE_MEAN': '00065_00003'}
+            self.header = {v: k for k, v in header.items()}
+        return self.header
+
+    def get_stations(self, state, eight_digit_station_only):
         if len(state) > 2:
                 state = get_state_fullname(state, reverse=True)#get acrynom
         state = state.lower()
@@ -186,21 +200,7 @@ class DailyFloodDataDownloader:
                 assert False, 'should not happen'
         return formatted_dict
 
-    def make_header(self):
-        if self.header is None: #default ones
-            header = {'STATIONNAME': 'name',
-                      'LATITUDE':'latitude',
-                      'LONGITUDE': 'longitude',
-                      'SITENUMBER': 'site_no',
-                      'DATE':'datetime',
-                      'GAGE_MAX': '00065_00001',
-                      'GAGE_MIN': '00065_00002',
-                      'GAGE_MEAN': '00065_00003'}
-            self.header = {v: k for k, v in header.items()}
-        return self.header
-
     def run(self):
-
         valid_station = 0
         if self.header is None:
             self.make_header()
