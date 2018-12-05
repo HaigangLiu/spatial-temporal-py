@@ -7,10 +7,11 @@ class DailyFloodDataDownloader:
     def __init__(self, start, end, state, eight_digit_station_only=True, cap=None, verbose=False, filename=None, attr_code='00065', header=None):
         '''
         download flood data for given state within a given time frame
-        1. first go to nws website to grab a list of available stations in that area
-        2. generate a url
-        3. parse that url and clean the data, which are written to a file
-        4. merge all files for all location in that state
+        recipes:
+            1. first go to nws website to grab a list of available stations in that area
+            2. generate a url for each location in that area
+            3. parse that url and clean the data, which are written to a dictionary
+            4. write all dictionaries to a file with given name
 
         Args:
             start (string): the starting time, format: '1990-01-01'
@@ -19,7 +20,13 @@ class DailyFloodDataDownloader:
                 all of these will work: 'SC', 'South Carolina', 'sc'
             eight_digit_station_only (boolean): if true, only use stream station and discard other stations which might be irrelelavent
             verbose (boolean): if true, more information will be given when downloading. Otherwise only progress will be reported.
-            cap (int) for demo purpose, we can limit the number of locations
+            cap (int) for demo purpose, we can limit the number of locations.
+            Program will stop after cap is reached.
+
+            verbose (boolean): more downloading information will be printed if
+            set to True
+            filename (string): the path of target file.
+            attr_code (string): the code
 
         Example:
             >>test = DailyFloodDataDownloader(start='2010-01-01', end='2010-01-02', state='SC')
@@ -226,20 +233,23 @@ class DailyFloodDataDownloader:
                         print(f'progress {idx}/{len(self.job_list)}')
 
                 if file_dict:
-                    if no_header_written:
-                        header = '\t'.join(list(file_dict.keys()))
-                        file.write(header+'\n')
-                        no_header_written = False
+                    if len(file_dict) == len(self.header):
+                        if no_header_written:
+                            header = '\t'.join(list(file_dict.keys()))
+                            file.write(header+'\n')
+                            no_header_written = False
 
-                    for value in zip(*file_dict.values()):
-                        file.write('\t'.join(value) + '\n')
+                        for value in zip(*file_dict.values()):
+                            file.write('\t'.join(value) + '\n')
 
                 if self.cap and valid_station >= self.cap + 1:
                     print(f'found {self.cap} stations already. teminating the program')
                     break
 
 if __name__ == '__main__':
-    test = DailyFloodDataDownloader(start='2010-01-01', end='2016-12-31', state='SC', cap=300, eight_digit_station_only=True, filename='amlaFinal.txt')
+    test = DailyFloodDataDownloader(start='2010-01-01', end='2016-12-31',
+        state='SC', cap=None, eight_digit_station_only=False,
+        filename='test.txt')
     s = test.run()
 
     # https://waterdata.usgs.gov/nwis/dv?cb_00065=on&format=rdb&site_no=02153051&referred_module=sw&period=&begin_date=2017-11-20&end_date=2018-11-20
