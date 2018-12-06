@@ -192,8 +192,12 @@ def fill_missing_dates(df_original, spatial_column=None, temporal_column=None, f
     temporal_column = 'DATE' if temporal_column is None else temporal_column
 
     df_original = df_original.reset_index(drop=True) #copy
-    start_date = df_original[temporal_column].min()
-    end_date = df_original[temporal_column].max()
+    try:
+        start_date = df_original[temporal_column].min()
+        end_date = df_original[temporal_column].max()
+    except KeyError:
+        print()
+        return None
     unique_days = get_in_between_dates(start_date, end_date)
 
     print('a new record will be added for any missing dates in the file')
@@ -354,7 +358,8 @@ def transpose_dataframe(original_df,
     dataframe = summary_form.merge(output_df, left_on=key, right_on=key, how='inner')
     return dataframe
 
-def mark_flood_season(original_df, start, end, time_col='DATE'):
+def mark_flood_season(original_df, start='2015-10-01', end='2015-12-31',
+   time_col='DATE'):
     '''
     add a dummy variable for flood season.
     This is because the rainfall and flood dynamics might be different on normal days vs. flood seasons.
@@ -370,7 +375,6 @@ def mark_flood_season(original_df, start, end, time_col='DATE'):
     return original_df
 
 def get_autoregressive_terms(dataframe, steps=1, groupby='SITENUMBER', date_col='DATE', variable='DEV_GAGE_MAX'):
-
     '''
     simple add np.nan in the first position, and shift everyone back a slot
     This is complicated by the existence of multiple stations.
@@ -382,7 +386,8 @@ def get_autoregressive_terms(dataframe, steps=1, groupby='SITENUMBER', date_col=
     date_col(str): the name of the time information column; defaul value 'DATE'
     variable(str): the name of the target column; default value 'DEV_GAGE_MAX'
     '''
-    variable_names = (variable + '_MINUS_' + str(step+1) for step in range(steps))
+    variable_names = [variable + '_MINUS_' + str(step+1) for step in range
+    (steps)]
     groups = dataframe[groupby].unique().tolist()
 
     modified_df = dataframe.copy()
