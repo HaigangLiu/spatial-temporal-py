@@ -104,7 +104,7 @@ class CarModel(BaseModel):
             else:
                 raise ValueError('dimension of covariates can only be either 1 or 2')
             covariates_.append(covariate)
-            covariates_.append(np.ones((n, correct_dim)))
+        covariates_.append(np.ones((n, correct_dim)))
         return covariates_
 
     def _get_weight_matrices(self):
@@ -144,7 +144,7 @@ class CarModel(BaseModel):
 
         with pm.Model() as self.model:
             # Priors for spatial random effects
-            tau = pm.Gamma('tau', alpha=2., beta=2.)
+            tau = pm.HalfNormal('tau', sd=100)
             alpha = pm.Uniform('alpha', lower=0, upper=1)
             self.phi = pm.MvNormal('phi',
                               mu=0,
@@ -157,7 +157,7 @@ class CarModel(BaseModel):
                 self.beta_variables = []; beta_names = []
                 for idx, covariate in enumerate(self.covariates):
                     var_name = '_'.join(['beta', str(idx)])
-                    beta_var = pm.Normal(var_name, mu=0.0, tau=1.0)
+                    beta_var = pm.Normal(var_name, mu=0.0, sd=100)
                     beta_names.append(var_name)
                     self.beta_variables.append(beta_var)
                     mu_  = mu_ + beta_var*covariate
@@ -173,7 +173,7 @@ class CarModel(BaseModel):
                     self.rho_variables.append(rho_var)
                     mu_  = mu_ + rho_var*autoterm
 
-            theta_sd = pm.Gamma('theta_sd', alpha=1.0, beta=1.0)
+            theta_sd = pm.HalfNormal('theta_sd', sd=100)
             Y = pm.Normal('Y', mu=mu_, tau=theta_sd, observed=self.response)
 
     def get_residual_by_region(self):
@@ -183,7 +183,7 @@ class CarModel(BaseModel):
         we average over different locations and thus got time series data for each big region.
         '''
         if self.predicted is None:
-            _ = self._predict_in_sample(sample_size=1000, use_median=False)
+            _ = self.predict_in_sample(sample_size=1000, use_median=False)
 
         residuals = self.response - self.predicted #94*365
         resid_df = pd.DataFrame(residuals)
@@ -205,22 +205,29 @@ class CarModel(BaseModel):
         if mode == 'time series':
             fig = residual_by_region.T.plot(figsize=[figsize_baseline, figsize_baseline], alpha=0.7)
             fig  = fig.get_figure()
-            figname_ = '_'.join([figname,'tsplot_for_resid.png']) if figname else 'tsplot_for_resid.png'
-            fig.savefig(figname_)
+
+            if figname is None:
+                from secrets import token_hex
+                figname = 'tsplot_for_resid' + str(token_hex(2)) + '.png'
+            # figname_ = '_'.join([figname,'tsplot_for_resid.png']) if figname else ''
+            fig.savefig(figname)
 
         elif mode == 'histogram':
             fig = residual_by_region.T.hist(figsize=[figsize_baseline,figsize_baseline], alpha=0.7)
-            figname_ = '_'.join([figname,  '_histogram_for_resid.png']) if figname else 'histogram_for_resid.png'
-            plt.savefig(figname_) #save the most recent
+            # figname_ = '_'.join([figname,  '_histogram_for_resid.png']) if figname else 'histogram_for_resid.png'
+            if figname is None:
+                from secrets import token_hex
+                figname = 'histogram_for_resid' + str(token_hex(2)) + '.png'
+            plt.savefig(figname) #save the most recent
 
         else:
             raise ValueError("only allow two modes: 'time series' or 'histogram'." )
 
-        full_dir  = os.path.join(os.getcwd(), figname_)
+        full_dir  = os.path.join(os.getcwd(), figname)
         print(f'the image file has been saved to {full_dir}')
         f = Image.open(full_dir).show()
 
-    def acf_by_region(self, figname=None, width=15, height=15*2.5, open_after_done=True):
+    def acf_by_region(self, figname=None, width=15, height=20, open_after_done=True):
         '''
         plot autoregressive functions
         '''
@@ -231,13 +238,13 @@ class CarModel(BaseModel):
             from secrets import token_hex
             random_token = token_hex(2)
             identifier = 'acf'
-            name = identifier + random_token + '.png'
+            name = identifier +  '-' + random_token + '.png'
         else:
             name = figname
 
         self._plot_rows(self.residual_by_region, acf, name, width, height, open_after_done)
 
-    def pacf_by_region(self, figname=None, width=15, height=15*2.5, open_after_done=True):
+    def pacf_by_region(self, figname=None, width=15, height=20, open_after_done=True):
         '''
         plot the partial autoregressive functions
         '''
@@ -248,24 +255,24 @@ class CarModel(BaseModel):
             from secrets import token_hex
             random_token = token_hex(2)
             identifier = 'pacf'
-            name = identifier + random_token + '.png'
+            name = identifier + '-' + random_token + '.png'
         else:
             name = figname
         self._plot_rows(self.residual_by_region, pacf, name, width, height, open_after_done)
 
     def _plot_rows(self, dataframe, transformation, figname, width, height, open_after_done):
         '''
-        internal utility function:
+        internal utility function for acf and pacf
         plot rows in pandas dataframe individually
         allow transformation before plotting.
         allow differing length of data after transformation
         '''
         canvass_for_all = plt.figure(figsize=[width, height])
-        columns = dataframe.columns.tolist()
-        num_of_figs = len(columns)
+        rows = dataframe.index.tolist()
+        num_of_figs = len(rows)
 
         for idx, arrays in enumerate(dataframe.values):
-            graph_name = str(columns.pop(0))
+            graph_name = str(rows.pop(0))
             plt.subplot(num_of_figs, 1, idx+1)
             if transformation:
                 tranformed_data = transformation(arrays)
@@ -281,49 +288,49 @@ class CarModel(BaseModel):
 
         print(f'the graph has been {figname} has been saved to {full_dir}')
 
-    def predict(self, new_data=None, sample_size=1000, use_median=False):
-        '''if there is no new data given, assume in-sample prediction. otherwise do it for new_x'''
-        if new_data is None:
-            print('no new data are given. In-sample predictions are made')
-            self._predict_in_sample(sample_size=sample_size, use_median=use_median)
-            return self.predicted
-        else:
-            print('predictions are made based on given new data')
-            self._predict_out_of_sample(new_x=new_data, sample_size=sample_size, use_median=use_median)
-            return self.predicted_new
+    def predict_in_sample(self, sample_size=1000, use_median=False):
+        self.predicted =  super()._predict_in_sample(sample_size=sample_size, use_median=use_median)
+        return self.predicted
 
-    def _predict_out_of_sample(self, steps=1, new_covariates=None, sample_size=1000, use_median=False):
+    def predict(self, new_x=None, steps=1, sample_size=1000, use_median=False):
         '''
-        make predictions for future dates
+        make predictions for future dates (out-of-sample prediction)
         Args:
             steps (int): how many days to forcast
-            new_covariates(list): a list of numpy arrays. The dimension should match number of days
+            new_x(list): a list of numpy arrays. The dimension should match number of days
             sample_size (int): sample size of posterior sample
             use_median(boolean): if true, use median as point estimate otherwise mean will be used.
         '''
-        if new_covariates:
+        if new_x:
             if not self.covariates:
-                raise ValueError('No covariates in original model; thus they should not show up in prediction.')
+                print('No covariates in original model; thus they should not show up in prediction.')
+                print('hence input covariates igored')
+                new_x = None
             else:
-                new_covariates = CarModel._covariate_handler(new_covariates, steps) #intercept added already
+                shape = new_x[0].shape
+                for numpy_array in new_x:
+                    if shape != numpy_array.shape:
+                        raise ValueError('the dimensions of covariates do not match!')
+                else:
+                    steps = shape[1] #1d sample size, 2d days
+                new_x = CarModel._covariate_handler(new_x, steps)
+
         else:
             if self.covariates:
-                raise ValueError('must provide covariates for new dates.')
+                raise ValueError('covariates not given. use predict_in_sample() if you want in-sample prediction.')
             else:
-                new_covariates = []
+                print(f'now predicting future {steps} day(s). Change steps=10 if i.e., 10 terms are desired.')
 
         if self.autoreg > 0:
             _, y_temp = np.hsplit(self.response, [-self.autoreg])
             last_ys = np.hsplit(y_temp, range(self.autoreg))
             last_ys.pop(0)
-
         else:
             last_ys = None
 
-        if steps >1 and new_covariates:
-
+        if steps >1 and new_x:
             x_split = []
-            for covariate_ndarray in new_covariates:
+            for covariate_ndarray in new_x:
                 x_split_one_var = np.hsplit(covariate_ndarray, [i for i in range(steps)])
                 x_split_one_var.pop(0)
                 x_split.append(x_split_one_var)
@@ -360,7 +367,7 @@ class CarModel(BaseModel):
             return y
 
         if steps == 1:
-            return predict_one_step(current_x=new_covariates, last_y=last_ys)
+            return predict_one_step(current_x=new_x, last_y=last_ys)
 
         elif steps > 1: #multipe steps
             y_history_rec = []
@@ -384,81 +391,27 @@ class CarModel(BaseModel):
             raise ValueError('steps has to be a positive integer!')
 
 if __name__ == '__main__':
+    from data_preprocessing_tools import transpose_dataframe
 
-    from data_preprocessing_tools import transpose_dataframe, mark_flood_season
-    from utility_functions import get_in_between_dates
+    data_all = pd.read_csv('./data/check_out.csv', dtype={'SITENUMBER': str}, index_col=0)
+    print(data_all.head())
+    print(data_all.shape)
+    retain = ['SITENUMBER','DATE','LATITUDE','LONGITUDE','ELEVATION', 'BASIN', 'PRCP', 'DEV_GAGE_MAX' ]
+    data_all = data_all[retain]
+    unstacked_df = data_all.set_index(['SITENUMBER', 'DATE'])
+    count = data_all.groupby(['SITENUMBER']).count()
+    print(count)
+    # # data_all = data_all[['SITENUMBER', 'ELEVATION','DATE','DEV_GAGE_MAX','PRCP', 'BASIN', 'FALL', 'SPRING', 'SUMMER','FLOOD_SEASON']]
+    # print(data_all.head())
+    # print(data_all.columns.tolist())
+    # train_fw = transpose_dataframe(data_all)
+    # # test_fw = transpose_dataframe(data_all, start='2015-12-27', end='2015-12-31', fixed_variables=['ELEVATION'], time_varying_variables=['PRCP', 'DEV_GAGE_MAX', 'SPRING', 'SUMMER','FALL','FLOOD_SEASON'])
 
-    start ='2015-01-01'; end = '2015-12-31'
-    num_days = len(get_in_between_dates(start, end))
 
-    checkout_df = pd.read_csv('./data/check_out.csv', dtype={'SITENUMBER': str}, index_col=0)
-    checkout_df = mark_flood_season(checkout_df, start='2015-10-01', end='2015-12-31')
+    # model_car_one_term = CarModel(covariates=[train_fw.PRCP.values],
+    #               locations=train_fw.BASIN.values,
+    #               response=train_fw.DEV_GAGE_MAX.values,
+    #               autoreg=1)
+    # model_car_one_term.fast_sample(iters=100000)
 
-    df_sample_flat_wide = transpose_dataframe(checkout_df, start=start, end=end, time_varying_variables=['PRCP', 'DEV_GAGE_MAX', 'SPRING', 'SUMMER','FALL','FLOOD_SEASON'])
 
-    gage_level = df_sample_flat_wide[[i for i in df_sample_flat_wide.columns if i.startswith('DEV')]].values
-    rainfall = df_sample_flat_wide[[i for i in df_sample_flat_wide.columns if i.startswith('PRCP')]].values
-    elevations = df_sample_flat_wide[[i for i in df_sample_flat_wide.columns if i.startswith('ELEVATION')]].values
-    elevations = np.tile(elevations, num_days)
-
-    flood_season_indicator = df_sample_flat_wide[[i for i in df_sample_flat_wide.columns if i.startswith('FLOOD_SEASON')]].values
-    spring = df_sample_flat_wide[[i for i in df_sample_flat_wide.columns if i.startswith('SPRING')]].values
-    summer = df_sample_flat_wide[[i for i in df_sample_flat_wide.columns if i.startswith('SUMMER')]].values
-    fall = df_sample_flat_wide[[i for i in df_sample_flat_wide.columns if i.startswith('FALL')]].values
-
-    locations = df_sample_flat_wide.BASIN.values
-    covariate_m1 = [rainfall]
-    covariate_m2 = [rainfall, elevations]
-    covariate_m3 = [rainfall, elevations, spring, summer, fall]
-    covariate_m4 = [rainfall, elevations, rainfall*elevations, spring, summer, fall]
-    covariate_m5 = [rainfall, flood_season_indicator,flood_season_indicator*rainfall, elevations]
-
-    if False:
-        m1 = CarModel(covariates=[rainfall, elevations],
-                      locations=locations,
-                      response=gage_level)
-        m1.fast_sample(iters=200)
-        # m1._predict_in_sample()
-
-    if True:
-        m1 = CarModel(covariates=[rainfall],
-                      locations=locations,
-                      response=gage_level,
-                      autoreg=1) #two terms of autoreg
-        m1.fast_sample(iters=10)
-        m1.acf_by_region()
-        m1.pacf_by_region()
-        # m1.predict()
-        # m1.get_metrics()
-        # m1.get_parameter_estimation(['beta_0', 'beta_1', 'rho_1','rho_2'], 0.95)
-        # m1.get_acf_and_pacf_by_region(figname='garbage')
-        # m1.get_residual_plots_by_region(figname='garbage')
-        # prediction = m1._predict_out_of_sample(new_covariates=[rainfall[:, 200:202]], steps=2)
-        # print(prediction)
-    if False:
-        m2 = CarModel(covariates=covariate_m2,
-                     locations=locations,
-                    response=gage_level)
-        m2.fit(fast_sampling=False, sample_size=1000)
-        m2.predict(covariates_m2_new)
-        m2.get_metrics()
-
-    if False:
-        print('start fitting the third model')
-        m3 = CarModel(covariates=covariate_m3,
-                      locations=locations,
-                      response=gage_level)
-        m3.fit(fast_sampling=False, sample_size=5000)
-        m3.get_metrics()
-
-    if False:
-        print('start fitting the fourth model')
-        m4 = CarModel(covariates=covariate_m5,
-                     locations=locations,
-                    response=gage_level)
-        m4.fit(fast_sampling=True, sample_size=5000)
-        # m4.predict()
-        m4.get_metrics()
-        # m4.get_residual_by_region()
-        m4.get_acf_and_pacf_by_region(figname='garbage')
-        m4.get_residual_plots_by_region(figname='garbage')
