@@ -139,34 +139,31 @@ def get_historical_median(dataframe, location_id='SITENUMBER', varname='GAGE_MAX
     print('-'*20)
     return dataframe
 
-def apply_imputation(dataframe, spatial_column=None, temporal_column=None,varname=None):
+def apply_imputation(dataframe, spatial_column='SITENUMBER', temporal_column='DATE', varnames=['GAGE_MAX']):
     '''
     For all locations in the dataset, there is any missing value,
-    we will impute the missing value by averaging the time before
-    and the time point after.
+    we will impute the missing value by averaging the time before and the time point after.
     '''
-    spatial_column = 'SITENUMBER' if spatial_column is None else spatial_column
-    temporal_column = 'DATE' if temporal_column is None else temporal_column
-    varname = 'GAGE_MAX' if varname is None else varname
+    missing_before = np.sum(np.isnan(dataframe[varnames])) #test
+    print(f'missing data status {missing_before}')
 
-    dataframe = dataframe.sort_values(['SITENUMBER', 'DATE']) #copy
-    begin = sum(np.isnan(dataframe[varname])) #test
+    def imputation(df):
+        df.sort_values(temporal_column, axis=0)
+        df.set_index(temporal_column, inplace=True)
+        # df[varnames] =  df[varnames].interpolate(axis=0, method='time')
+        dict_fill_na = df[varnames].mean(axis=0).to_dict()
+        df[varnames] = df[varnames].fillna(dict_fill_na)
+        return df
 
-    try:
-        location_list = dataframe[spatial_column].unique().tolist()
-        dataframe.set_index(spatial_column, inplace=True)
-        for location in location_list:
-            dataframe.loc[location, varname] = dataframe.loc[location, varname].interpolate()
-    except KeyError:
-        print('make sure the spelling of the name of spatial-related column and temporal related column is right.')
-        print('spatial-related column usually comes as station, or station id. Default value is SITENUMBER')
-        print('temporal-related column usually comes as date or year, default value is DATE.')
-    end = sum(np.isnan(dataframe[varname])) #test
+    dataframe = dataframe.groupby(spatial_column, group_keys=False).apply(imputation)
+    missing_after = np.sum(np.isnan(dataframe[varnames]))
+    print(f'missing data status after imputing {missing_after}')
 
-    print('the imputation is done sucessfully.')
-    print(f'there are {begin} missing values in {varname} before and {end} missing values after')
-    print('-'*20)
-    return dataframe.reset_index(drop=False)
+    if missing_after.any():
+        for varname in varnames:
+            dataframe.loc[np.isnan(dataframe[varname]), varname] = np.mean(dataframe[varname])
+        print('filled all other missing data with column mean')
+    return dataframe.reset_index()  #test
 
 def fill_missing_dates(df_original, spatial_column='SITENUMBER',
     temporal_column='DATE', method_to_fill_missing='nearest'):
@@ -195,15 +192,15 @@ def fill_missing_dates(df_original, spatial_column='SITENUMBER',
     print(f'found {len(df) - start_counter} missing dates in the dataset.')
     return df
 
-def remove_incomplete_locations(dataframe, station='SITENUMBER', varname='GAGE_MAX', threshold=0.9):
+def remove_incomplete_locations(dataframe, station='SITENUMBER', varname=['GAGE_MAX'], threshold=0.90):
     '''
     Removes locations based on temporal completeness. Default is 90%, which means we discard
     locations with more than 10% of missing dates.
     We assume there is no missing dates for each location, if you suspect otherwise,
     use fill_missing_dates to preprocess data first.
     '''
-    size_ = pd.Series(dataframe.groupby([station])[[varname]].size()) #no NA
-    count_ = pd.Series(dataframe.groupby([station])[[varname]].count().values.ravel(), index=size_.index) #include na and everything
+    size_ = pd.Series(dataframe.groupby([station])[varname].size()) #no NA
+    count_ = pd.Series(dataframe.groupby([station])[varname].count().values.ravel(), index=size_.index) #include na and everything
 
     start_counter = len(size_)
     ratio = (count_/size_).to_frame()
@@ -213,7 +210,7 @@ def remove_incomplete_locations(dataframe, station='SITENUMBER', varname='GAGE_M
     df_with_ratio = df_with_ratio[ df_with_ratio['RATIO'] >= threshold]
     df_with_ratio.drop(['RATIO'], axis=1, inplace=True)
 
-    end_counter = len(pd.Series(df_with_ratio.groupby([station])[[varname]].size()))
+    end_counter = len(pd.Series(df_with_ratio.groupby([station])[varname].size()))
     print(f'setting threshold to {threshold} has removed {start_counter - end_counter} locations')
     return df_with_ratio
 
@@ -267,19 +264,21 @@ def get_season_from_dates(dataframe, date_column='DATE', one_hot=True):
                           'SEASON_3': 'FALL'})
     return dataframe
 
-def transpose_dataframe(df,
-                   spatial_col='SITENUMBER',
-                   temporal_col='DATE',
-                   start='2015-01-01',
-                   end='2015-12-31',
-                   constants = ['LATITUDE','LONGITUDE','ELEVATION', 'BASIN'],
-                   variables=['PRCP', 'GAGE_MAX_DEV']):
+def transpose(df,
+              spatial_col='SITENUMBER',
+              temporal_col='DATE',
+              start='2015-01-01',
+              end='2015-12-31',
+              constants = ['LATITUDE','LONGITUDE','ELEVATION', 'BASIN'],
+              variables=['PRCP', 'GAGE_MAX_DEV']):
+
+    df = df[(df.DATE <= pd.to_datetime(end)) & (df.DATE >= pd.to_datetime(start))]
 
     time_range = pd.date_range(start, end)
     x_ = variables
     product = [x_, time_range]
 
-    colnames =[ ]
+    colnames =[]
     for variable in variables:
         for day in range(len(time_range)):
             colnames.append(variable + '_' + str(day))
@@ -319,7 +318,6 @@ def get_autoregressive_terms(df, steps=1, groupby_var='SITENUMBER',
     groupby(str): the location/site identifier column. Each station/site should have its own time series default value (groupby)
     variable(str): the name of the target column; default value 'DEV_GAGE_MAX'
     '''
-
     if date_var not in df:
         raise KeyError(f'cannot find {date_var}. Need to sort values by dates')
         return None
@@ -339,12 +337,11 @@ def get_autoregressive_terms(df, steps=1, groupby_var='SITENUMBER',
                       suffixes=['', '_MINUS_'+ str(i+1)])
     return dataframe
 
-
 if __name__ == '__main__':
     from datetime import datetime
     parse_dates= ['DATE']
     f = pd.read_csv('./data/flood_data_daily_beta.csv', index_col=0, dtype={'SITENUMBER': str}, parse_dates=parse_dates)
-    f = f[(f.DATE >= datetime(2015, 1, 1)) & (f.DATE <= datetime(2015, 12, 31))]
+    f = f[(f.DATE >= datetime(2010, 1, 1)) & (f.DATE <= datetime(2016, 12, 31))]
 
     f = fill_missing_dates(f)
     f = get_season_from_dates(f)
@@ -358,35 +355,12 @@ if __name__ == '__main__':
     f = get_watershed(f) #0.5
     f = get_basin_from_watershed(f) #0.1
 
-    f = transpose_dataframe(f, variables=['GAGE_MAX_DEV'])
-
-
-    # raw_df = pd.read_csv('./data/rainfall_and_flood_10_beta.csv', index_col=0, dtype={'SITENUMBER': str})
-
-    # checkout_df = pd.read_csv('./data/check_out.csv', dtype={'SITENUMBER': str}, index_col=0)
-    # checkout_df = mark_flood_season(checkout_df, start='2015-10-01',
-    #     end='2015-12-31')
-
-    # ss = transpose_dataframe(checkout_df, start='2010-01-01', end='2010-01-02')
-
-    # rain_df = pd.read_csv('./demo/SC_20050101-20170627-19b7.txt', delimiter=" ")
-    # raw_df = pd.read_csv('./data/flood_data_daily_beta.csv', index_col=0, dtype={'SITENUMBER': str})
-    # raw_df = fill_missing_dates(raw_df, fixed_vars = ['LATITUDE','LONGITUDE']) #0.7
+    f = transpose(f, variables=['GAGE_MAX_DEV'])
+    print(f.shape)
 
     # from merge_rain_and_flood import Merger
     # print('start merging')
     # raw_df = Merger(raw_df, rain_df, '2010-01-01', '2016-12-31').run()
     # print('finished merging')
-    # # raw_df.drop(['index'], axis=1, inplace=True)
-    # # should fill missing dates first
-    # # then merge...
+    # raw_df.drop(['index'], axis=1, inplace=True)
 
-    # raw_df = filter_missing_locations(raw_df, varname='GAGE_MAX', threshold=0.85) #0.5
-    # raw_df = apply_imputation(raw_df, varname='GAGE_MAX') #0.4
-    # #explain this part #e
-    # raw_df = get_historical_median(raw_df, varname='GAGE_MAX') #0.3
-    # raw_df = get_elevation(raw_df) #0.7
-    # raw_df = get_watershed(raw_df) #0.5
-    # raw_df = get_basin_from_watershed(raw_df) #0.1
-    # raw_df = get_autoregressive_terms(raw_df, steps=2)
-    # raw_df.to_csv('./data/check_out.csv') #13.6 -> 6.3
