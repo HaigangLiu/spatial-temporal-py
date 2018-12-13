@@ -99,26 +99,25 @@ class PreprocessingPipeline:
         temp1_index = df_reindexed.unstack()[vars_to_retain].index
 
         temp1_reset_index = pd.DataFrame(temp1, columns = column_name, index = temp1_index).reset_index()
-        temp1_reset_index.set_index(self.unique_column_name, inplace = True)
-        unique_locations.set_index(self.unique_column_name, inplace = True)
+
+        temp1_reset_index.set_index(self.unique_column_name,
+                                    inplace = True)
+        unique_locations.set_index(self.unique_column_name,
+                                    inplace = True)
 
         self.output = temp1_reset_index.merge(unique_locations, left_index = True, right_index = True).reset_index()
         return self
 
     def get_values(self):
-
         try:
             self.output.drop(['Unnamed: 0'], axis = 1, inplace = True)
         except KeyError:
             pass
-
         return self.output
 
 if __name__ == '__main__':
 
     # ---- working with rainfall data ------
-
-
     target_dir_rain = './data/monthly_rainfall.csv'
     monthly_rain = pd.read_csv(target_dir_rain)
 
@@ -170,5 +169,3 @@ if __name__ == '__main__':
                         add_sst_info().\
                         flip_to_flat_and_wide(vars_to_retain = ['GAGE_MAX', 'SST']).\
                         get_values()
-
-
