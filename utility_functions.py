@@ -49,6 +49,10 @@ def get_in_between_dates(start_date, end_date):
         start_date (string): Must follow 'xxxx-xx-xx' order: (year-month-day)
         end_date (string): Must follow 'xxxx-xx-xx' order: (year-month-day)
     '''
+    if type(start_date) != str:
+        start_date = start_date.strftime('%Y-%m-%d')
+    if type(end_date) != str:
+        end_date = end_date.strftime('%Y-%m-%d')
 
     try:
         s_year, s_month, s_day = start_date.split('-') #s for start
