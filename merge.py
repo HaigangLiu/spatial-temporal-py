@@ -1,5 +1,4 @@
 import pandas as pd
-import pickle
 from scipy import spatial
 from datetime import datetime
 
@@ -15,8 +14,7 @@ class Merger:
 
     def add_source(self, src, grid_col='SITE', date_col='DATE', lat_col='LATITUDE', lon_col='LONGITUDE',info_col='PRCP'):
 
-        self.source_grid = src.set_index(grid_col)
-        self.grid_col_source = grid_col
+        source = src.set_index(grid_col)
         self.date_col_source = date_col
         self.lat_col_source = lat_col
         self.lon_col_source = lon_col
@@ -29,13 +27,11 @@ class Merger:
         assert info_col in src, f'KeyError. column {info_col} not found'
 
         #make tree here
-        grid_summary = self.source_grid.groupby([grid_col]).first()[[lat_col, lon_col]]
-        d1_src = grid_summary[lat_col].values
-        d2_src = grid_summary[lon_col].values
-
-        self.kdtree = spatial.KDTree(list(zip(d1_src, d2_src)))
-        self.summary_g = grid_summary
-        self.source_grid[date_col] = pd.to_datetime(self.source_grid[date_col])
+        self.summary_g = source.groupby([grid_col]).first()[[lat_col, lon_col]]
+        source[date_col] = pd.to_datetime(source[date_col])
+        self.source = source[(source[date_col] >= self.start) & (source
+            [date_col]<= self.end)]
+        self.kdtree = spatial.KDTree(self.summary_g[[lat_col, lon_col]].values)
 
     def add_target(self, df, site_col='SITENUMBER', date_col='DATE', lat_col='LATITUDE', lon_col='LONGITUDE'):
 
@@ -52,50 +48,47 @@ class Merger:
 
         self.summary_t = self.target.groupby(site_col).first()[[lat_col, lon_col]]
         self.target[date_col] = pd.to_datetime(self.target[date_col])
+        self.target = self.target[(self.target[date_col] >= self.start) & (self.target[date_col]
+           <= self.end)]
 
     def merge(self):
 
-        d1_tgt = self.summary_t[self.lat_col_target].values
-        d2_tgt = self.summary_t[self.lon_col_target].values
-        _, idx = self.kdtree.query(list(zip(d1_tgt, d2_tgt)))
+        dis = self.summary_t[[self.lat_col_target, self.lon_col_target]].values
+        _, idx = self.kdtree.query(dis)
 
         site_to_src = {}
         for site, grid in zip(self.summary_t.index.tolist(), self.summary_g.index[idx]):
             site_to_src[site] = grid
 
-        linking_dict = site_to_src
         date_t = self.date_col_target
         date_s = self.date_col_source
         site_t = self.site_col_target
-
         range_index = self.date_index
-        E = self.end
-        S = self.start
 
-        source_ = self.source_grid[(self.source_grid[date_s] >= S) & (self.source_grid[date_s] <= E)]
-        target_ = self.target[(self.target[date_t] >= S) & (self.target[date_t] <= E)]
-
-        target_time_indexed = target_.groupby(site_t).apply(lambda df: df.set_index(date_t).reindex(range_index))
-        source_time_indexed = source_.groupby(level=0).apply(lambda df: df.set_index(date_s).reindex(range_index))
-        source_time_indexed.index.names = ['_', '_']
-        target_time_indexed.index.names = [site_t, date_t] #only main frame name matters in merging!
+        target_ = self.target.groupby(level=0).apply(lambda df: df.set_index
+            (date_t).reindex(range_index))
+        source_ = self.source.groupby(level=0).apply(lambda df: df.set_index
+            (date_s).reindex(range_index))
+        source_.index.names = ['_', '_']
+        target_.index.names = [site_t, date_t] #only main frame name matters in merging!
 
         output = []
-        for sitenumber, df_per_site in target_time_indexed.groupby(level=site_t):
+        for sitenumber, df_per_site in target_.groupby(level=0):
             df_per_site = df_per_site.reset_index(drop=True, level=0)
             df_per_site[site_t] = sitenumber
-            additional_info = source_time_indexed.loc[linking_dict[sitenumber], self.info_col_source].to_frame()
+            additional_info = source_.loc[site_to_src[sitenumber], self.info_col_source].to_frame()
             output.append(pd.merge(df_per_site, additional_info, left_index=True, right_index=True))
-
         return pd.concat(output).reset_index()
 
 if __name__ == '__main__':
-    merg = Merger('2015-01-01', '2016-12-31')
-
+    import pickle
     with open('./demo/grid_rain.pickle', 'rb') as handler:
-        data = pickle.load(handler)
-    flood = pd.read_csv('./data/flood_data_daily_beta.csv', index_col=0, dtype={'SITENUMBER': str})
+        rain_grid = pickle.load(handler)
+    with open('./demo/rain_flood.pickle', 'rb') as handler:
+        flood = pickle.load(handler)['flood']
 
+    merge = Merger('2015-01-01', '2015-12-31')
     merge.add_target(flood)
-    merge.add_source(data)
+    merge.add_source(rain_grid)
     combined = merge.merge()
+    print(combined.head())
