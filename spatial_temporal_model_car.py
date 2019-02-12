@@ -26,22 +26,15 @@ class CarModel(BaseModel):
         super().__init__(response, locations, covariates)
 
         assert response.ndim == 2, 'response should have 2 dimensions.'
-        assert response.shape[1] > 1, 'only one days is detected. Use spatial module instead.'
+        assert response.shape[1] > 1, 'only one day is detected. Use spatial module instead.'
 
-        if covariates:
-            assert type(covariates) == list, 'covariates has to be a list of numpy array'
-            self.dim = len(covariates)
-        else:
-            covariates = []
-            self.dim = 0
+        self.N, self.number_of_days = response.shape
 
-        self.N = response.shape[0]
-        self.number_of_days = response.shape[1]
+        if covariates is None:
+            self.covariates = [np.ones_like(response)]
+        self.covariates = CarModel.pad_covariates(self.covariates, self.number_of_days)
 
-        if covariates:
-            self.covariates = CarModel._covariate_handler(covariates, self.number_of_days)
-        else:
-            self.covariates = []
+        CarModel.report_input_summary(size=self.N, days=self.number_of_days, covars=len(self.covariates))
 
         self.shifted_response = []
         if autoreg: # redefine both x and y
@@ -61,23 +54,70 @@ class CarModel(BaseModel):
             self.number_of_days = self.number_of_days - autoreg
             print(f'autoregressive term is {autoreg}, and first {autoreg} day(s) will be used as covariates')
 
-        print('-'*40)
-        print('BASIC INFO FROM INPUT')
-        print('-'*10)
-        print(f'The sample size is {self.N}.')
-        print(f'The time span is {self.number_of_days} days, and there are {self.dim} covariates in the model')
-        print('Double check the input if any of these information does not seem right.')
-
-        self.weight_matrix = None
-        self.adjacent_matrix = None
-        self._get_weight_matrices()
+        self.adjacency_matrix, self.weight_matrix = CarModel.get_weight_matrices(locations)
 
         self.residuals = None
-        self.residual_by_region = None #average over stations in that region; time series data
+        # self.residual_by_region = None #average over stations in that region; time series data
         self.autoreg = autoreg
 
+    @classmethod
+    def from_pandas(cls, dataframe, response, locations, covariates=None):
+        '''
+        support specifying the model by column name
+        dataframe (pandas): a dataframe
+        response (string): name of the response variabel column
+        locations (list): list of names of columns that specifies location
+        covariates (list, NoneType by default): list of names of columns that specifies the covariates.
+        '''
+        locations = [locations] if type(locations) == str else locations
+        if type(response)!= str:
+            raise TypeError('the response variable has to be string of column name of repsonse varaible')
+        if type(locations)!= list:
+            raise TypeError('Locations has to be a list of column names that detemines the location')
+        if covariates and (type(covariates)!= list):
+            raise TypeError('Covariates must be a list or NoneType')
+
+        all_variables_in_df = dataframe.columns.tolist()
+        response_input = dataframe[[col for col in all_variables_in_df if response in col]].values
+        locations_input = dataframe[locations].values
+
+        if response_input.ndim != 2:
+            raise ValueError('the response variable should be two-dimensional')
+        if response_input.shape[1] == 1:
+            print('the response variable only has one column')
+            print('you either need to input data of more than one day')
+            print('or reshape the data frame into a wide format')
+            raise ValueError('dimension error')
+
+        if covariates:
+            cov_list = []; tracker = 2
+            for cov in covariates:
+                list_for_one_var = []
+                for col in all_variables_in_df:
+                    if cov in col:
+                        list_for_one_var.append(col)
+                tracker = max(tracker, len(list_for_one_var))
+                cov_list.append(list_for_one_var)
+
+            cov_input = [dataframe[cov_input_i].values for cov_input_i in cov_list]
+            if tracker <= 1:
+                raise ValueError('convert dataframe into flat format first')
+        else:
+            cov_input = None
+
+        return cls(response_input, locations_input, cov_input)
+
     @staticmethod
-    def _covariate_handler(covariates, correct_dim):
+    def report_input_summary(size, days, covars):
+        print('-'*40)
+        print('BASIC INFO FROM INPUT DATA')
+        print('-'*40)
+        print(f'--> The sample size is {size}.')
+        print(f'--> The time span is {days} days, and there are {covars} covariates in the model, intercept included')
+        print('--> Double check the input if any of these information does not seem right.')
+
+    @staticmethod
+    def pad_covariates(covariates, expected_dim, intercept=False):
         '''
         a helper function to make sure the dimension of input numpy arrays are correct
         three situations are considered:
@@ -86,78 +126,73 @@ class CarModel(BaseModel):
         2. shape = (10 ,1), like first case, populate to (10, 10)
         3. shape = (10, 9) raise ValueError since data type not understood.
         '''
-        covariates_ = [] #pure sanity check
-        n = covariates[0].shape[0]
-
+        covariates_ = []
         for covariate in covariates:
-            if n != covariate.shape[0]:
-                raise ValueError('the length of covariates are not equal')
             if np.ndim(covariate) == 1:
-                covariate = np.tile(covariate[:, None], correct_dim)
+                covariate = np.tile(covariate[:, None], expected_dim)
             elif np.ndim(covariate) == 2:
-                if covariate.shape[1] == correct_dim:
+                if covariate.shape[1] == expected_dim:
                     pass
                 elif covariate.shape[1] == 1:
-                    covariate = np.tile(covariate, correct_dim)
+                    covariate = np.tile(covariate, expected_dim)
                 else:
-                    raise ValueError(f'the proper dimension is {correct_dim}, get {covariate.shape[1]} instead')
+                    raise ValueError(f'the proper dimension is {expected_dim}, get {covariate.shape[1]} instead')
             else:
                 raise ValueError('dimension of covariates can only be either 1 or 2')
             covariates_.append(covariate)
-        covariates_.append(np.ones((n, correct_dim)))
+        if intercept:
+            covariates_.append(np.ones((n, expected_dim)))
         return covariates_
 
-    def _get_weight_matrices(self):
+    @staticmethod
+    def get_weight_matrices(location_arr):
         try:
-            location_list = self.locations.tolist()
+            location_list = location_arr.tolist()
         except AttributeError:
             print('all inputs must be numpy.array type')
             return None
 
-        neighbor_matrix = []
-        weight_matrix = []
-        adjacent_matrix = []
+        neighbor_info = []
+        weight_info = []
+        proximity_info = []
 
         for entry in location_list:
             w = [0 if entry!=comp else 1 for comp in location_list]
-            neighbor_matrix.append(w)
-        neighbor_matrix = np.array(neighbor_matrix)
+            neighbor_info.append(w)
+        neighbor_info = np.array(neighbor_info)
 
-        for idx, row in enumerate(neighbor_matrix):
+        for idx, row in enumerate(neighbor_info):
             mask = np.argwhere(row == 1).ravel().tolist()
             mask.remove(idx) #delete the location itself.
-            adjacent_matrix.append(mask)
-            weight_matrix.append([1]*len(mask))
+            proximity_info.append(mask)
+            weight_info.append([1]*len(mask))
 
-        wmat2 = np.zeros((self.N, self.N))
-        amat2 = np.zeros((self.N, self.N), dtype='int32')
+        N = len(location_arr)
+        weight_matrix = np.zeros((N, N))
+        adjacency_matrix = np.zeros((N, N), dtype='int32')
 
-        for i, a in enumerate(adjacent_matrix):
-            amat2[i, a] = 1
-            wmat2[i, a] = weight_matrix[i]
-
-        self.adjacent_matrix = amat2
-        self.weight_matrix = wmat2
-        self.D = np.diag(self.weight_matrix.sum(axis=1))
+        for i, a in enumerate(proximity_info):
+            adjacency_matrix[i, a] = 1
+            weight_matrix[i, a] = weight_info[i]
+        return [adjacency_matrix, weight_matrix]
 
     def fit(self, sample_size=3000, sig=0.95):
-
         with pm.Model() as self.model:
             # Priors for spatial random effects
-            tau = pm.HalfNormal('tau', sd=100)
+            tau = pm.Gamma('tau', alpha=2., beta=2.)
             alpha = pm.Uniform('alpha', lower=0, upper=1)
+            D = np.diag(self.weight_matrix.sum(axis=1))
             self.phi = pm.MvNormal('phi',
                               mu=0,
-                              tau=tau*(self.D - alpha*self.weight_matrix),
+                              tau=tau*(D - alpha*self.weight_matrix),
                               shape=(self.number_of_days, self.N) #the second dim has covar structure
                               )
             mu_ = self.phi.T
-
             if self.covariates: #add covars
                 self.beta_variables = []; beta_names = []
                 for idx, covariate in enumerate(self.covariates):
                     var_name = '_'.join(['beta', str(idx)])
-                    beta_var = pm.Normal(var_name, mu=0.0, sd=100)
+                    beta_var = pm.Normal(var_name, mu=0.0, tau=1)
                     beta_names.append(var_name)
                     self.beta_variables.append(beta_var)
                     mu_  = mu_ + beta_var*covariate
@@ -173,120 +208,58 @@ class CarModel(BaseModel):
                     self.rho_variables.append(rho_var)
                     mu_  = mu_ + rho_var*autoterm
 
-            theta_sd = pm.HalfNormal('theta_sd', sd=100)
+            theta_sd = pm.Gamma('theta_sd', alpha=2, beta=2)
             Y = pm.Normal('Y', mu=mu_, tau=theta_sd, observed=self.response)
 
-    def get_residual_by_region(self):
-        '''
-        get residuals for each region.
-        For one regions, there is usually multiple locations and multiple days,
-        we average over different locations and thus got time series data for each big region.
-        '''
+    def plot(self, kind, filename=None, file_dir=None, open_after_done=True):
+
         if self.predicted is None:
-            _ = self.predict_in_sample(sample_size=1000, use_median=False)
-
-        residuals = self.response - self.predicted #94*365
-        resid_df = pd.DataFrame(residuals)
-        resid_df['watershed'] = self.locations #94, 366
-        self.residual_by_region = resid_df.groupby('watershed').mean() #8, 366
-        return self.residual_by_region
-
-    def get_residual_plots_by_region(self, figname=None, mode='time series', figsize_baseline=10):
-        '''
-        provide either time series plot or histogram for residuals; split by different region.
-        For each region, we find the mean of every time point
-        if there are muliple observations for that regions and that day.
-        '''
-        if self.residual_by_region is None:
-            _ = self.get_residual_by_region()
-
-        residual_by_region = self.residual_by_region
-
-        if mode == 'time series':
-            fig = residual_by_region.T.plot(figsize=[figsize_baseline, figsize_baseline], alpha=0.7)
-            fig  = fig.get_figure()
-
-            if figname is None:
-                from secrets import token_hex
-                figname = 'tsplot_for_resid' + str(token_hex(2)) + '.png'
-            # figname_ = '_'.join([figname,'tsplot_for_resid.png']) if figname else ''
-            fig.savefig(figname)
-
-        elif mode == 'histogram':
-            fig = residual_by_region.T.hist(figsize=[figsize_baseline,figsize_baseline], alpha=0.7)
-            # figname_ = '_'.join([figname,  '_histogram_for_resid.png']) if figname else 'histogram_for_resid.png'
-            if figname is None:
-                from secrets import token_hex
-                figname = 'histogram_for_resid' + str(token_hex(2)) + '.png'
-            plt.savefig(figname) #save the most recent
-
+            predicted_values = self.predict_in_sample(sample_size=1000, use_median=False)
         else:
-            raise ValueError("only allow two modes: 'time series' or 'histogram'." )
+            predicted_values = self.predicted
 
-        full_dir  = os.path.join(os.getcwd(), figname)
-        print(f'the image file has been saved to {full_dir}')
-        f = Image.open(full_dir).show()
-
-    def acf_by_region(self, figname=None, width=15, height=20, open_after_done=True):
-        '''
-        plot autoregressive functions
-        '''
-        if self.residual_by_region is None:
-            _ = self.get_residual_by_region()
-
-        if figname is None: #give a random name
+        residuals = self.response - predicted_values
+        residuals = pd.DataFrame(residuals, index=self.locations)
+        regional_resid = residuals.groupby(level=0).mean()
+        #column is day, row is river basin
+        if filename is None:
             from secrets import token_hex
-            random_token = token_hex(2)
-            identifier = 'acf'
-            name = identifier +  '-' + random_token + '.png'
-        else:
-            name = figname
+            filename = kind + '-' + token_hex(2) + '.png'
+            print(f'filename not specified. The auto generated file name is {filename}')
 
-        self._plot_rows(self.residual_by_region, acf, name, width, height, open_after_done)
+        if kind.lower() in 'histogram':
+            figure, axes = plt.subplots(1,1)
+            _ = regional_resid.T.hist(ax=axes, sharex=True, sharey=True)
+            plt.tight_layout()
 
-    def pacf_by_region(self, figname=None, width=15, height=20, open_after_done=True):
-        '''
-        plot the partial autoregressive functions
-        '''
-        if self.residual_by_region is None:
-            _ = self.get_residual_by_region()
+        elif kind.lower() in 'time series':
+            figure, axes = plt.subplots(1,1)
+            _ = regional_resid.T.plot(ax=axes)
 
-        if figname is None:
-            from secrets import token_hex
-            random_token = token_hex(2)
-            identifier = 'pacf'
-            name = identifier + '-' + random_token + '.png'
-        else:
-            name = figname
-        self._plot_rows(self.residual_by_region, pacf, name, width, height, open_after_done)
+        elif kind.lower() in ['acf', 'pacf']:
+            graph_height = 2*len(per_loc)
+            figure, axes = plt.subplots(1,1, figsize=[10, graph_height])
 
-    def _plot_rows(self, dataframe, transformation, figname, width, height, open_after_done):
-        '''
-        internal utility function for acf and pacf
-        plot rows in pandas dataframe individually
-        allow transformation before plotting.
-        allow differing length of data after transformation
-        '''
-        canvass_for_all = plt.figure(figsize=[width, height])
-        rows = dataframe.index.tolist()
-        num_of_figs = len(rows)
-
-        for idx, arrays in enumerate(dataframe.values):
-            graph_name = str(rows.pop(0))
-            plt.subplot(num_of_figs, 1, idx+1)
-            if transformation:
-                tranformed_data = transformation(arrays)
+            if kind.lower() == 'acf':
+                per_loc = regional_resid.apply(acf, axis=1) #pd.Series object
             else:
-                tranformed_data = arrays
-            pd.Series(tranformed_data).plot(kind='bar', color='lightblue')
-            plt.text(0.8,0.5, s=graph_name, horizontalalignment='left')
+                per_loc = regional_resid.apply(pacf, axis=1) #pd.Series object
 
-        full_dir = os.path.join(os.getcwd(), figname)
-        canvass_for_all.savefig(full_dir)
+            per_loc = pd.DataFrame(per_loc.values.tolist(), index=per_loc.index)
+            per_loc.T.plot(kind='bar', subplots=True, ax=axes)
+        else:
+            raise ValueError('only support histogram, acf, pacf and time series of residuals')
+
+        if file_dir is None:
+            file_dir = os.path.join(os.getcwd(), filename)
+        else:
+            file_dir = os.path.join(file_dir, filename)
+
+        figure.savefig(file_dir, dpi=300)
+        print(f'the figure has been saved to {file_dir}.')
+
         if open_after_done:
-            f = Image.open(full_dir).show()
-
-        print(f'the graph has been {figname} has been saved to {full_dir}')
+            _ = Image.open(file_dir).show()
 
     def predict_in_sample(self, sample_size=1000, use_median=False):
         self.predicted =  super()._predict_in_sample(sample_size=sample_size, use_median=use_median)
@@ -313,7 +286,7 @@ class CarModel(BaseModel):
                         raise ValueError('the dimensions of covariates do not match!')
                 else:
                     steps = shape[1] #1d sample size, 2d days
-                new_x = CarModel._covariate_handler(new_x, steps)
+                new_x = CarModel.pad_covariates(new_x, steps)
 
         else:
             if self.covariates:
@@ -396,16 +369,16 @@ if __name__ == '__main__':
     data_all = pd.read_csv('./data/check_out.csv', dtype={'SITENUMBER': str}, index_col=0)
     print(data_all.head())
     print(data_all.shape)
-    retain = ['SITENUMBER','DATE','LATITUDE','LONGITUDE','ELEVATION', 'BASIN', 'PRCP', 'DEV_GAGE_MAX' ]
-    data_all = data_all[retain]
-    unstacked_df = data_all.set_index(['SITENUMBER', 'DATE'])
-    count = data_all.groupby(['SITENUMBER']).count()
-    print(count)
-    # # data_all = data_all[['SITENUMBER', 'ELEVATION','DATE','DEV_GAGE_MAX','PRCP', 'BASIN', 'FALL', 'SPRING', 'SUMMER','FLOOD_SEASON']]
+    # retain = ['SITENUMBER','DATE','LATITUDE','LONGITUDE','ELEVATION', 'BASIN', 'PRCP', 'DEV_GAGE_MAX' ]
+    # data_all = data_all[retain]
+    # unstacked_df = data_all.set_index(['SITENUMBER', 'DATE'])
+    # count = data_all.groupby(['SITENUMBER']).count()
+    # print(count)
+    # data_all = data_all[['SITENUMBER', 'ELEVATION','DATE','DEV_GAGE_MAX','PRCP', 'BASIN', 'FALL', 'SPRING', 'SUMMER','FLOOD_SEASON']]
     # print(data_all.head())
     # print(data_all.columns.tolist())
     # train_fw = transpose_dataframe(data_all)
-    # # test_fw = transpose_dataframe(data_all, start='2015-12-27', end='2015-12-31', fixed_variables=['ELEVATION'], time_varying_variables=['PRCP', 'DEV_GAGE_MAX', 'SPRING', 'SUMMER','FALL','FLOOD_SEASON'])
+    # test_fw = transpose_dataframe(data_all, start='2015-12-27', end='2015-12-31', fixed_variables=['ELEVATION'], time_varying_variables=['PRCP', 'DEV_GAGE_MAX', 'SPRING', 'SUMMER','FALL','FLOOD_SEASON'])
 
 
     # model_car_one_term = CarModel(covariates=[train_fw.PRCP.values],
