@@ -10,7 +10,6 @@ from statsmodels.tsa.stattools import acf, pacf
 from base_model import BaseModel
 
 theano.config.compute_test_value = "ignore" #no default value error shall occur without this line
-FAST_SAMPLE_ITERATION = 50 #advi setting
 
 class CarModel(BaseModel):
     '''
@@ -212,7 +211,6 @@ class CarModel(BaseModel):
             Y = pm.Normal('Y', mu=mu_, tau=theta_sd, observed=self.response)
 
     def plot(self, kind, filename=None, file_dir=None, open_after_done=True):
-
         if self.predicted is None:
             predicted_values = self.predict_in_sample(sample_size=1000, use_median=False)
         else:
@@ -220,8 +218,8 @@ class CarModel(BaseModel):
 
         residuals = self.response - predicted_values
         residuals = pd.DataFrame(residuals, index=self.locations)
-        regional_resid = residuals.groupby(level=0).mean()
-        #column is day, row is river basin
+        regional_resid = residuals.groupby(level=0).mean()#column is day, row is river basin
+
         if filename is None:
             from secrets import token_hex
             filename = kind + '-' + token_hex(2) + '.png'
@@ -237,16 +235,18 @@ class CarModel(BaseModel):
             _ = regional_resid.T.plot(ax=axes)
 
         elif kind.lower() in ['acf', 'pacf']:
-            graph_height = 2*len(per_loc)
-            figure, axes = plt.subplots(1,1, figsize=[10, graph_height])
 
             if kind.lower() == 'acf':
                 per_loc = regional_resid.apply(acf, axis=1) #pd.Series object
             else:
                 per_loc = regional_resid.apply(pacf, axis=1) #pd.Series object
 
+            graph_height = 2*len(per_loc)
+            figure, axes = plt.subplots(1,1, figsize=[10, graph_height])
             per_loc = pd.DataFrame(per_loc.values.tolist(), index=per_loc.index)
             per_loc.T.plot(kind='bar', subplots=True, ax=axes)
+            plt.tight_layout()
+
         else:
             raise ValueError('only support histogram, acf, pacf and time series of residuals')
 
@@ -260,6 +260,7 @@ class CarModel(BaseModel):
 
         if open_after_done:
             _ = Image.open(file_dir).show()
+
 
     def predict_in_sample(self, sample_size=1000, use_median=False):
         self.predicted =  super()._predict_in_sample(sample_size=sample_size, use_median=use_median)
