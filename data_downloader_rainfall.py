@@ -55,7 +55,26 @@ class RainfallDownloaderByState:
                     dir_, fname = os.path.split(local_file)
                     target_folder_name = re.findall('\d{8}', fname)[0]#8-number, should be date
                 with tarfile.open(local_file) as tar:
-                    tar.extractall(os.path.join(dir_, target_folder_name))
+                    def is_within_directory(directory, target):
+                        
+                        abs_directory = os.path.abspath(directory)
+                        abs_target = os.path.abspath(target)
+                    
+                        prefix = os.path.commonprefix([abs_directory, abs_target])
+                        
+                        return prefix == abs_directory
+                    
+                    def safe_extract(tar, path=".", members=None, *, numeric_owner=False):
+                    
+                        for member in tar.getmembers():
+                            member_path = os.path.join(path, member.name)
+                            if not is_within_directory(path, member_path):
+                                raise Exception("Attempted Path Traversal in Tar File")
+                    
+                        tar.extractall(path, members, numeric_owner=numeric_owner) 
+                        
+                    
+                    safe_extract(tar, os.path.join(dir_,target_folder_name))
                 print(f'unpacking the data for {target_folder_name}')
             except EOFError:
                 print(f'connection failed (incomplete tarfile), trying for the {i+2}th time')
